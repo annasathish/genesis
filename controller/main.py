@@ -88,6 +88,49 @@ async def inject_fault(fault_type: str, target: str, ttl_seconds: int = 60, para
     )
     return {"status": "success", "result": res}
 
+from pydantic import BaseModel
+from typing import List
+
+class FaultRequest(BaseModel):
+    fault_type: str
+    target: str
+    params: dict = None
+
+class CombinedFaultRequest(BaseModel):
+    faults: List[FaultRequest]
+    ttl_seconds: int = 60
+
+@app.post("/api/v1/inject/combined")
+async def inject_combined_faults(req: CombinedFaultRequest):
+    """Stretch Goal: Run multiple failures together concurrently"""
+    import asyncio
+    from faults.manager import ChaosManager
+    chaos_manager = ChaosManager(session_factory=SessionLocal)
+    
+    # Schedule all faults concurrently
+    tasks = []
+    for f in req.faults:
+        tasks.append(
+            chaos_manager.schedule_and_inject(
+                fault_type=f.fault_type,
+                target=f.target,
+                params=f.params or {},
+                ttl_seconds=req.ttl_seconds
+            )
+        )
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Format results
+    final_results = []
+    for r in results:
+        if isinstance(r, Exception):
+            final_results.append({"status": "error", "message": str(r)})
+        else:
+            final_results.append({"status": "success", "result": r})
+            
+    return {"status": "combined_execution_started", "results": final_results}
+
 @app.post("/api/v1/rollback/{intent_id}")
 async def rollback_fault(intent_id: int):
     """Manual rollback override"""
