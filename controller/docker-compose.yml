@@ -1,0 +1,62 @@
+# Controller project (M1 scaffolding; code owned by M2/M3/M4/M5).
+# Separate compose project from the sandbox, so `docker compose down` on one never touches the other.
+# Start the sandbox first (`make sandbox-up`): this project joins its network.
+
+name: chaos-controller
+
+x-infra-labels: &infra
+  com.chaospilot.role: infra
+  com.chaospilot.tier: controller
+
+x-common: &common
+  build: .
+  image: chaos-controller:dev
+  working_dir: /app
+  volumes:
+    - ./:/app                                      # live code
+    - ../sandbox:/sandbox:ro                       # M2 mapper reads ../sandbox/docker-compose.yaml (resolves to /sandbox from /app)
+    - /var/run/docker.sock:/var/run/docker.sock    # Docker SDK: crash/restart/exec faults, health
+    - chaos-data:/data                             # SQLite lives here, NOT on the Windows bind mount (file locking)
+  environment:
+    CHAOS_DB_URL: sqlite:////data/chaos_state.db  # M2/M4: read this instead of the hard-coded ./chaos_state.db
+    CHAOS_DB_PATH: sqlite:////data/chaos_state.db # M5 reporter.py reads this name
+    HEARTBEAT_FILE: /data/heartbeat.json          # M4: shared by api (writer) and watchdog (reader)
+    SANDBOX_DIR: /sandbox
+    SANDBOX_PROJECT: robotshop
+    TARGET_LABEL: com.chaospilot.role=target       # only containers with this label may be faulted
+    TOXIPROXY_URL: http://toxiproxy:8474
+    LOCUST_URL: http://load:8089
+    RABBITMQ_API: http://rabbitmq:15672
+    APP_URL: http://web:8080
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  env_file:
+    - path: .env
+      required: false
+  networks: [default, sandbox]
+  labels: *infra
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *common
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["127.0.0.1:8000:8000"]
+    mem_limit: 320m
+
+  watchdog:
+    # M4's dead-man switch. Behind a profile until main.py writes heartbeats: with no heartbeat it treats the
+    # controller as dead every 5 s and clears all toxics / restarts stopped containers, undoing every injection.
+    # Start it with `make watchdog-up` once /data/heartbeat.json is being written.
+    <<: *common
+    command: ["python", "-u", "watchdog.py"]
+    profiles: [watchdog]
+    mem_limit: 128m
+    depends_on: [api]
+
+volumes:
+  chaos-data:
+
+networks:
+  sandbox:
+    external: true
+    name: robotshop_robot-shop
