@@ -15,6 +15,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+# Include Dashboard APIs
+from dashboard_api import router as dashboard_router
+app.include_router(dashboard_router)
+
 @app.get("/")
 def read_root():
     return {"status": "Controller is running", "role": "M2"}
