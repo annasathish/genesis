@@ -13,6 +13,7 @@ from .rabbitmq_block import RabbitMQFault
 __all__ = [
     "AsyncDockerClient",
     "BaseFault",
+    "ChaosManager",
     "ContainerCrashFault",
     "DiskStressFault",
     "NetworkLatencyFault",
@@ -21,3 +22,12 @@ __all__ = [
     "NotFound",
     "APIError",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for ChaosManager to defer the sqlalchemy dependency."""
+    if name == "ChaosManager":
+        from .manager import ChaosManager
+
+        return ChaosManager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
