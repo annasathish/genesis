@@ -33,4 +33,6 @@ class ExperimentResult(Base):
     intent_id = Column(Integer, nullable=False)
     kill_switch_fired = Column(Boolean, default=False)
     recovery_time_sec = Column(Float, nullable=True)
-    resilience_score = Column(Float, nullable=True)  # Normalized 0-1
+    resilience_score = Column(Float, nullable=True)
+    target_service = Column(String, nullable=True)
+    details = Column(String, nullable=True)

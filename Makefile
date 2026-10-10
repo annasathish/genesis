@@ -96,10 +96,10 @@ watchdog-up:    ## M4: dead-man watchdog. Off by default until main.py writes he
 	$(CTL) --profile watchdog up -d watchdog
 
 inject:         ## M3: usage make inject fault=container_crash target=cart
-	@echo "make inject is owned by M3 - add the command here (fault=$(fault) target=$(target))" && exit 1
+	curl -s -X POST "$(API)/api/v1/inject" -H "Content-Type: application/json" -d '{"fault_type": "$(fault)", "target": "$(target)"}'
 
 stop:           ## M3/M4: kill switch + rollback
-	@echo "make stop is owned by M3/M4 - until then use: make toxics-clear && make sandbox-up" && exit 1
+	curl -s -X POST "$(API)/api/v1/safety/trip?reason=ManualStop"
 
 report:         ## M5
 	$(CTL) exec api python cli.py report

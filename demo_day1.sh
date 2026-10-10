@@ -119,7 +119,7 @@ if command -v make >/dev/null 2>&1 && make -n inject >/dev/null 2>&1; then
 else
     curl -s -X POST "${CONTROLLER_URL}/api/v1/inject" \
         -H "Content-Type: application/json" \
-        -d '{"fault_type": "container_crash", "target_service": "ratings"}' || true
+        -d '{"fault_type": "container_crash", "target": "ratings"}' || true
 fi
 
 log_info "Observing system telemetry for 15 seconds (Kill Switch should remain ARMED)..."
@@ -141,7 +141,7 @@ if command -v make >/dev/null 2>&1 && make -n inject >/dev/null 2>&1; then
 else
     curl -s -X POST "${CONTROLLER_URL}/api/v1/inject" \
         -H "Content-Type: application/json" \
-        -d '{"fault_type": "container_crash", "target_service": "cart"}' || true
+        -d '{"fault_type": "container_crash", "target": "cart"}' || true
 fi
 
 # ------------------------------------------------------------------------------

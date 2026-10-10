@@ -9,13 +9,13 @@ import mapper
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from heartbeat import HeartbeatEmitter
+    from heartbeat import HeartbeatManager
     from kill_switch import KillSwitch
     
-    hb = HeartbeatEmitter()
+    hb = HeartbeatManager()
     hb.start_background()
     
-    ks = KillSwitch(session_factory=SessionLocal)
+    ks = KillSwitch()
     ks.start_background()
     
     yield
@@ -126,12 +126,6 @@ async def inject_fault(req: FaultRequest):
     )
     return {"status": "success", "result": res}
 
-from pydantic import BaseModel
-from typing import List
-
-    faults: List[FaultRequest]
-    ttl_seconds: int = 60
-
 @app.post("/api/v1/inject/combined")
 async def inject_combined_faults(req: CombinedFaultRequest):
     """Stretch Goal: Run multiple failures together concurrently"""
@@ -191,8 +185,8 @@ def get_safety_status():
     # For now, let's just return what the demo expects.
     try:
         db = SessionLocal()
-        from models import SafetyTripEvent
-        last_trip = db.query(SafetyTripEvent).order_by(SafetyTripEvent.timestamp.desc()).first()
+        from models import ExperimentResult
+        last_trip = db.query(ExperimentResult).filter(ExperimentResult.kill_switch_fired == True).first()
         state = "TRIPPED" if last_trip else "ARMED"
     except Exception:
         state = "UNKNOWN"

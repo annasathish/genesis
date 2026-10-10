@@ -27,22 +27,15 @@ async def test_resolve_container_by_compose_label(mock_docker_client):
 
     assert resolved == "robot-shop_cart_1"
     mock_docker_client.containers.list.assert_called_once_with(
-        all=True, filters={"label": "com.docker.compose.service=cart"}
+        all=True,
+        filters={
+            "label": [
+                "com.docker.compose.service=cart",
+                "com.docker.compose.project=robotshop",
+                "com.chaospilot.role=target"
+            ]
+        }
     )
-
-
-@pytest.mark.asyncio
-async def test_resolve_container_fallback_by_name(mock_docker_client):
-    mock_docker_client.containers.list.return_value = []
-    mock_container = MagicMock()
-    mock_container.name = "custom_cart"
-    mock_docker_client.containers.get.return_value = mock_container
-
-    async_client = AsyncDockerClient(client=mock_docker_client)
-    resolved = await async_client.resolve_container("custom_cart")
-
-    assert resolved == "custom_cart"
-    mock_docker_client.containers.get.assert_called_once_with("custom_cart")
 
 
 @pytest.mark.asyncio

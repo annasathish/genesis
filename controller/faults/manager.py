@@ -204,7 +204,7 @@ class ChaosManager:
                     # We can't know exact metrics here without passing telemetry, 
                     # but we create the row. The telemetry loop can update it, 
                     # or it just records that it finished.
-                    details=details or {"error": error_msg} if error_msg else {}
+                    details=json.dumps(details) if details else json.dumps({"error": error_msg}) if error_msg else "{}"
                 )
                 db.add(res)
             except ImportError:
