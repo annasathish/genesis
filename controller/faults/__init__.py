@@ -8,6 +8,7 @@ from .docker_client import (
     NotFound,
 )
 from .network_latency import NetworkLatencyFault
+from .rabbitmq_block import RabbitMQFault
 
 __all__ = [
     "AsyncDockerClient",
@@ -15,6 +16,7 @@ __all__ = [
     "ContainerCrashFault",
     "DiskStressFault",
     "NetworkLatencyFault",
+    "RabbitMQFault",
     "DockerException",
     "NotFound",
     "APIError",
