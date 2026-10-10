@@ -7,12 +7,21 @@ Based on upstream load-gen/robot-shop.py (Apache-2.0), changed for chaos experim
   - the full flow (browse -> cart -> shipping -> pay) is one task, so checkout
     success rate is a clean end-to-end SLI
   - no fake X-Forwarded-For IPs (they only fed Instana geo maps)
+  - city lookup uses /match/<code>/<prefix> like the real UI's autocomplete, not
+    /cities/<code> (unbounded: /cities/ru returns 216k rows and OOMs shipping)
 
 Stats the Observer reads: GET http://127.0.0.1:8089/stats/requests
 """
 import random
 
 from locust import HttpUser, between, task
+
+# country -> 3-letter city prefix (UI autocomplete needs >= 3 chars). Each verified against the
+# Robot Shop cities dump: 7..1445 matching rows, so /match stays small (it returns <= 9).
+CITY_PREFIX = {
+    "gb": "lon", "us": "new", "de": "ber", "fr": "par", "in": "del", "es": "mad", "it": "rom",
+    "ru": "mos", "br": "sao", "ca": "tor", "jp": "tok", "se": "sto", "nl": "ams", "tr": "ist", "cz": "pra",
+}
 
 
 def _json(resp):
@@ -84,10 +93,19 @@ class Shopper(HttpUser):
             codes = _json(r)
         if not codes:
             return
-        code = random.choice(codes)
+        # The real UI never calls /cities/<code>: it autocompletes via /match/<code>/<3+ chars> (<= 9 results).
+        # /cities/ru materialises 216k JPA rows (~200 MB heap) per request and OOM-kills shipping's Tomcat
+        # threads at 10 users. That unbounded endpoint is a finding for the report, not baseline traffic.
+        known = [c for c in codes if c.get("code") in CITY_PREFIX]
+        if not known:
+            return
+        code = random.choice(known)
 
-        with self.client.get(f"/api/shipping/cities/{code['code']}", name="shipping:cities", catch_response=True) as r:
+        with self.client.get(f"/api/shipping/match/{code['code']}/{CITY_PREFIX[code['code']]}",
+                             name="shipping:match", catch_response=True) as r:
             cities = _json(r)
+            if cities == []:
+                r.failure("match returned no cities")
         if not cities:
             return
         city = random.choice(cities)

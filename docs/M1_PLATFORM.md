@@ -90,18 +90,31 @@ Mongo and Redis data are in RAM: a restart of those containers re-seeds Mongo an
 ## Load and telemetry (M4)
 
 - Locust service `load`, 10 users by default (`LOCUST_USERS` in `sandbox/.env`). Stats: `GET http://127.0.0.1:8089/stats/requests` (or `http://load:8089` from the controller).
-- Request names are stable per endpoint: `web:index`, `catalogue:products|product|categories`, `ratings:fetch|rate`, `user:uniqueid|login`, `cart:add`, `shipping:codes|cities|calc|confirm`, `payment:pay`. `payment:pay` success = end-to-end checkout SLI. The row named `Aggregated` = totals.
+- Request names are stable per endpoint: `web:index`, `catalogue:products|product|categories`, `ratings:fetch|rate`, `user:uniqueid|login`, `cart:add`, `shipping:codes|match|calc|confirm`, `payment:pay`. `payment:pay` success = end-to-end checkout SLI. The row named `Aggregated` = totals.
 - Traffic spike: `POST http://127.0.0.1:8089/swarm` with form fields `user_count=100&spawn_rate=20`; back to `user_count=10`.
 - Async health: RabbitMQ `GET /api/queues` (guest/guest) → `orders` queue `messages`, `consumers`.
 
 ## Controller (M2, M4, M5)
 
-- `controller/docker-compose.yml`: `api` (uvicorn `main:app`, port 8000) and `watchdog` (`python watchdog/watchdog.py`, placeholder for M4).
-- Code is bind-mounted from `controller/`, so edits apply on `docker compose restart api`.
-- Image = M2's `controller/Dockerfile` + `requirements.txt` (M1 doesn't touch them). **M2: please add `alembic`, `docker`, `httpx` (and M5: `jinja2`, `typer`) to requirements.txt** - the image currently lacks them.
+- `controller/docker-compose.yml`: `api` (uvicorn `main:app`, port 8000) and `watchdog` (M4's `controller/watchdog.py`, behind the `watchdog` profile: `make watchdog-up`).
+- Code is bind-mounted from `controller/`, so edits apply on `docker compose -f controller/docker-compose.yml restart api`.
+- Image = `controller/Dockerfile` + `requirements.txt`. M1 added `alembic`, `docker`, `httpx` (imported by M2/M4 code, missing before).
 - Containers have the Docker socket, the sandbox network (reach `toxiproxy:8474`, `load:8089`, `rabbitmq:15672`, `web:8080` by name) and `../sandbox` at `/sandbox` (read-only).
-- **SQLite: use `CHAOS_DB_URL` (= `sqlite:////data/chaos_state.db`, a named volume shared by api + watchdog).** SQLite on a Windows bind mount breaks file locking with two writers. M2: please read the env var instead of the hard-coded `./chaos_state.db`. M5 offline report: `docker compose -f controller/docker-compose.yml run --rm api python cli.py report` uses the same volume without the server running.
-- Env available: `SANDBOX_DIR`, `SANDBOX_PROJECT`, `TARGET_LABEL`, `TOXIPROXY_URL`, `LOCUST_URL`, `RABBITMQ_API`, `APP_URL`, `GEMINI_API_KEY` (put the key in `controller/.env`, gitignored).
+- Env set for you: `SANDBOX_PROJECT=robotshop` (**not** `robot-shop`), `TOXIPROXY_URL`, `LOCUST_URL`, `RABBITMQ_API`, `APP_URL`, `TARGET_LABEL`, `CHAOS_DB_URL` and `CHAOS_DB_PATH` (= `sqlite:////data/chaos_state.db`), `HEARTBEAT_FILE=/data/heartbeat.json`, `GEMINI_API_KEY` (from `controller/.env`, gitignored).
+- `/data` is a named volume shared by api + watchdog. SQLite and the heartbeat must live there: on the Windows bind mount (`/app`) SQLite file locking breaks with two writers.
+- Team targets: `make baseline [dur=600]` (runs in `api`), `make report`, `make test`, `make watchdog-up`.
+
+### Integration issues found when merging main @ a95eb3c (owners, please fix)
+
+| # | Owner | Problem | Effect | Fix |
+| --- | --- | --- | --- | --- |
+| 1 | M4 (+M2 main.py) | `main.py` never starts `HeartbeatManager`; `/api/v1/telemetry/current` and `/api/v1/safety/status` are missing. `tests/test_main_safety.py` fails (61 pass, 1 fail) | watchdog sees no heartbeat (age = inf) and fires every 5 s: clears all toxics and restarts stopped containers, undoing every injection. That is why it is behind a profile | start `HeartbeatManager(os.environ["HEARTBEAT_FILE"])` in a FastAPI startup/lifespan hook; commit the M4 endpoints; watchdog should only fire if an intent is `running` or a heartbeat existed and went stale |
+| 2 | M4 | default `SANDBOX_PROJECT="robot-shop"` in kill_switch/telemetry/watchdog and in M4_INTEGRATION_TEST_GUIDE.md | real project is `robotshop`: on the host every container is rejected, rollback restarts nothing | default to `robotshop` (compose already sets it) |
+| 3 | M2/M4/M5 | DB path: `main.py`/`cli.py` use `./chaos_state.db`, kill_switch/baseline/watchdog use `CURRENT_DIR/chaos_state.db`, reporter reads `CHAOS_DB_PATH` | three code paths, the first two on the Windows bind mount | all read `os.environ.get("CHAOS_DB_URL", "sqlite:///./chaos_state.db")` |
+| 4 | M4 | rollback only calls `c.start()` when status != running | a paused container (`docker pause` fault) is not unpaused (`start` fails on paused); tmpfs fill files are never removed; a hung-but-running service (see shipping finding) is not restarted | handle `paused` -> `unpause()`; delete `/data/db/chaos_fill`, `/data/chaos_fill`, `/chaos/chaos_fill`; restart containers whose health is `unhealthy`; then `restart web` if any container was recreated |
+| 5 | M4 | allowed-services list includes `load`, omits `payment-gateway` | a stopped payment-gateway is never revived | select by label `com.chaospilot.role=target` instead of a hard-coded list |
+| 6 | M3 | no injector on main yet | nothing to test end-to-end | — |
+| 7 | M2/M5 | `google-generativeai` is deprecated (FutureWarning on import) | works today, no fixes upstream | move to `google-genai` when convenient |
 
 ## Deviations from the M1 task file (and why)
 
@@ -112,6 +125,10 @@ Mongo and Redis data are in RAM: a restart of those containers re-seeds Mongo an
 | Toxiproxy example shipping → rabbitmq on 15672 | payment → rabbitmq on 5672 (+ 8 more edges) | shipping never talks to RabbitMQ (payment publishes, dispatch consumes); pika uses port 5672 from the host name, so the proxy must listen on 5672 |
 | Run upstream `load` container | our own Locust as service `load` | upstream rs-load runs headless with no stats API; M4 needs `/stats/requests` |
 | "11 services" | 12 upstream + payment-gateway stub + toxiproxy + load = 15 | `web`'s nginx needs all 6 API services to start; upstream payment calls the real paypal.com |
+
+## Known weakness found while building the sandbox (use it in the findings report)
+
+`GET /api/shipping/cities/<code>` returns every city of a country with no limit (`cityrepo.findByCode`). `/cities/ru` = 215,938 rows, `/cities/us` = 141,989. Each request materialises them as JPA entities (~150-250 MB heap). Upstream's load generator calls it; the real UI does not (it autocompletes via `/match/<code>/<3 chars>`, max 9 rows). Observed 2026-10-10: with `-Xmx384m`, 10 users caused `OutOfMemoryError` in Tomcat's `Acceptor` and `ClientPoller` threads after ~20 min, so the JVM stayed up with the port open but answered nothing: health check timed out, CPU ~0, container never exited. Fixes to recommend: paginate/limit the query, stream the response, and `-XX:+ExitOnOutOfMemoryError` so the orchestrator can restart it (applied here).
 
 ## Running make on Windows
 
@@ -126,7 +143,7 @@ Sandbox caps total ~3.2 GB; expected real use ~1.5-2 GB (measure with `make stat
 | Symptom | Fix |
 | --- | --- |
 | `mongodb` exits at start, log mentions `wiredTigerEngineConfigString` or "No space left" | remove the `--wiredTigerEngineConfigString` pair from the override and raise its tmpfs to 256M (mem_limit 576m) |
-| `shipping` logs `Java heap space`, exits 3 or 137, or is `unhealthy` with all requests timing out | heap too small for `/cities` payloads: raise `-Xmx` (now 512m) and `mem_limit` (now 960m) together. `-XX:+ExitOnOutOfMemoryError` makes an OOM a crash, not a hang |
+| `shipping` logs `Java heap space`, exits 3, or is `unhealthy` with every request timing out | something is calling `/api/shipping/cities/<code>` (unbounded, see below). Locust uses `/match`. `-XX:+ExitOnOutOfMemoryError` makes an OOM a crash (exit 3), not a hang |
 | 502 from `web` right after a service was recreated | nginx in `web` cached the old container IP: `docker compose restart web` (M3/M4: do this after any recreate, not after a plain restart/stop-start) |
 | `mysql` unhealthy > 4 min on first start | still importing cities: `make logs svc=mysql` |
 | `load` exits immediately | Locust tag without `--autostart`: set `LOCUST_TAG` in `sandbox/.env` to a recent 2.x |
