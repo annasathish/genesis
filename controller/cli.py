@@ -22,8 +22,12 @@ app = typer.Typer(
 )
 console = Console()
 
+@app.callback()
+def callback():
+    """Genesis Chaos Platform - M5 Reporting CLI"""
+    pass
 
-@app.command()
+@app.command(name="report")
 def report(
     llm: bool = typer.Option(
         False,
@@ -45,15 +49,15 @@ def report(
     Generate the resilience report from the SQLite experiment journal.
 
     Reads ExperimentIntent, ExperimentResult, and MetricsSnapshot tables
-    directly — the FastAPI controller does NOT need to be running.
+    directly - the FastAPI controller does NOT need to be running.
     """
-    console.print("\n[bold cyan]🧪 Genesis — Generating Resilience Report[/bold cyan]\n")
+    console.print("\n[bold cyan]Genesis - Generating Resilience Report[/bold cyan]\n")
 
     if llm:
         import os
         if not os.environ.get("GEMINI_API_KEY"):
             console.print(
-                "[bold red]⚠  GEMINI_API_KEY not set. "
+                "[bold red]WARNING: GEMINI_API_KEY not set. "
                 "Falling back to heuristic analysis.[/bold red]\n"
             )
             llm = False
@@ -87,7 +91,7 @@ def report(
             )
         console.print(wtable)
 
-    console.print(f"\n[green]✅ report.json and REPORT.md written to {out}/[/green]\n")
+    console.print(f"\n[green]SUCCESS: report.json and REPORT.md written to {out}/[/green]\n")
 
 
 if __name__ == "__main__":

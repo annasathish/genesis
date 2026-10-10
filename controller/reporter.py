@@ -97,12 +97,12 @@ def _get_during_fault_metrics(
 def _classify_criticality(score_10: float) -> str:
     """Map a /10 score to a human-readable criticality label."""
     if score_10 <= 3.0:
-        return "🔴 Critical"
+        return "Critical"
     if score_10 <= 5.0:
-        return "🟠 High"
+        return "High"
     if score_10 <= 7.0:
-        return "🟡 Medium"
-    return "🟢 Low"
+        return "Medium"
+    return "Low"
 
 
 # ── Core Report Builder ────────────────────────────────────────────
