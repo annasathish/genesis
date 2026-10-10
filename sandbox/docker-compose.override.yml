@@ -115,12 +115,12 @@ services:
       com.chaospilot.tier: service
 
   shipping:
-    # upstream runs -Xmx768m; capped for the 5 GB host. If it exits with code 137, use -Xmx384m and mem_limit 576m.
-    command: ["java", "-Xms64m", "-Xmn64m", "-Xmx256m", "-XX:MaxMetaspaceSize=128m", "-XX:+UseSerialGC", "-jar", "shipping.jar"]
+    # upstream runs -Xmx768m. 256m threw "Java heap space" on /cities/ru (large result set), so 384m.
+    command: ["java", "-Xms64m", "-Xmn128m", "-Xmx384m", "-XX:MaxMetaspaceSize=128m", "-XX:+UseSerialGC", "-jar", "shipping.jar"]
     environment:
       DB_HOST: toxiproxy:3306                                # shipping_to_mysql (used as jdbc:mysql://<DB_HOST>/cities)
       CART_ENDPOINT: toxiproxy:18080                         # shipping_to_cart
-    mem_limit: 448m
+    mem_limit: 640m
     healthcheck: {start_period: 120s}
     labels:
       <<: *target

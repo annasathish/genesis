@@ -40,7 +40,7 @@ Makefile, TOOLS_AND_LIBS.md, scripts/setup-wslconfig.ps1
 | Service | Tier label | Notes |
 | --- | --- | --- |
 | web | gateway | nginx + UI, proxies `/api/<svc>/` to each service |
-| catalogue, user, cart, shipping, ratings, payment | service | shipping is Java (heap capped 256m) |
+| catalogue, user, cart, shipping, ratings, payment | service | shipping is Java (heap capped 384m) |
 | dispatch | worker | consumes `orders` queue from RabbitMQ |
 | mongodb, mysql | database | |
 | redis | cache | |
@@ -126,7 +126,7 @@ Sandbox caps total ~3.2 GB; expected real use ~1.5-2 GB (measure with `make stat
 | Symptom | Fix |
 | --- | --- |
 | `mongodb` exits at start, log mentions `wiredTigerEngineConfigString` or "No space left" | remove the `--wiredTigerEngineConfigString` pair from the override and raise its tmpfs to 256M (mem_limit 576m) |
-| `shipping` exits 137 / restarts | OOM: `-Xmx384m`, `mem_limit: 576m` |
+| `shipping` logs `Java heap space` / exits 137 | heap too small: raise `-Xmx` (now 384m) and `mem_limit` (now 640m) together |
 | `mysql` unhealthy > 4 min on first start | still importing cities: `make logs svc=mysql` |
 | `load` exits immediately | Locust tag without `--autostart`: set `LOCUST_TAG` in `sandbox/.env` to a recent 2.x |
 | `'!override' ... unknown tag` | Docker Compose older than 2.24.4: update Docker Desktop |
