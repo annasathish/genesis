@@ -71,7 +71,25 @@ def generate_adaptive_plan(last_intent_id: int):
         db.close()
 
 @app.post("/api/v1/inject")
-def inject_fault():
+async def inject_fault(fault_type: str, target: str, ttl_seconds: int = 60, params: dict = None):
     """Triggered by CLI to start a chaos experiment"""
-    # TODO: Forward to M3's execution modules
-    pass
+    from faults.manager import ChaosManager
+    chaos_manager = ChaosManager(session_factory=SessionLocal)
+    
+    res = await chaos_manager.schedule_and_inject(
+        fault_type=fault_type,
+        target=target,
+        params=params or {},
+        ttl_seconds=ttl_seconds
+    )
+    return {"status": "success", "result": res}
+
+@app.post("/api/v1/rollback/{intent_id}")
+async def rollback_fault(intent_id: int):
+    """Manual rollback override"""
+    from faults.manager import ChaosManager
+    chaos_manager = ChaosManager(session_factory=SessionLocal)
+    
+    res = await chaos_manager.rollback(intent_id)
+    return {"status": "success", "result": res}
+
