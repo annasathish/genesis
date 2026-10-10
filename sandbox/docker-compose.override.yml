@@ -188,7 +188,8 @@ services:
               "--autostart", "--users", "${LOCUST_USERS:-10}", "--spawn-rate", "2"]
     volumes: ["./locust:/mnt/locust:ro"]
     ports: ["127.0.0.1:8089:8089"]   # UI + REST: /stats/requests, /swarm, /stop
-    mem_limit: 256m
+    mem_limit: 512m                  # 256m was OOM-killed after ~12 min
+    restart: unless-stopped          # infra: load must survive on its own (app targets have no restart policy)
     networks: [robot-shop]
     labels:
       com.chaospilot.role: infra
