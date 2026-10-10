@@ -10,7 +10,8 @@ PYTHON ?= python
 API    ?= http://127.0.0.1:8000
 
 .PHONY: help pull up down nuke sandbox-up controller-up ps logs stats verify test-caps test-fill \
-        toxics-clear db-export backup-fetch backup-build backup-up backup-down map baseline inject stop report
+        toxics-clear db-export backup-fetch backup-build backup-up backup-down map baseline inject stop report \
+        test watchdog-up controller-dev watchdog-dev demo
 
 help:
 	@echo "M1 platform targets:"
@@ -23,7 +24,7 @@ help:
 	@echo "  make test-caps     tmpfs caps are real (safe)   | make test-fill  prove caps hold (fills disks)"
 	@echo "  make toxics-clear  remove every Toxiproxy toxic (manual panic for network faults)"
 	@echo "  make backup-fetch | backup-build | backup-up | backup-down   Martian Bank hot standby"
-	@echo "Team targets: make map (M2) | baseline (M4) | inject fault=.. target=.. (M3) | stop (M3/M4) | report (M5)"
+	@echo "Team targets: make map (M2) | baseline [dur=600] (M4) | watchdog-up (M4) | inject (M3) | stop (M3/M4) | report (M5) | test | demo"
 
 # ------------------------------------------------------------------ sandbox
 pull:
@@ -88,8 +89,11 @@ backup-down:
 map:            ## M2
 	curl -s -X POST $(API)/api/v1/map
 
-baseline:       ## M4: replace with the real command
-	@echo "make baseline is owned by M4 - add the command here" && exit 1
+baseline:       ## M4: steady-state capture inside the controller container (writes controller/baseline.json)
+	$(CTL) exec api python baseline.py --duration $(or $(dur),600) --interval 5
+
+watchdog-up:    ## M4: dead-man watchdog. Off by default until main.py writes heartbeats (see docs/M1_PLATFORM.md)
+	$(CTL) --profile watchdog up -d watchdog
 
 inject:         ## M3: usage make inject fault=container_crash target=cart
 	@echo "make inject is owned by M3 - add the command here (fault=$(fault) target=$(target))" && exit 1
@@ -98,7 +102,19 @@ stop:           ## M3/M4: kill switch + rollback
 	@echo "make stop is owned by M3/M4 - until then use: make toxics-clear && make sandbox-up" && exit 1
 
 report:         ## M5
-	@echo "make report is owned by M5 - add the command here" && exit 1
+	$(CTL) exec api python cli.py report
+
+test:           ## unit tests (host Python; needs controller/requirements.txt installed)
+	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v
+
+controller-dev: ## run the API on the host instead of Docker (debugging only)
+	cd controller && $(PYTHON) -m uvicorn main:app --host 127.0.0.1 --port 8000
+
+watchdog-dev:   ## run the watchdog on the host (debugging only)
+	cd controller && SANDBOX_PROJECT=robotshop $(PYTHON) watchdog.py
+
+demo:
+	bash demo_day1.sh
 
 db-export:      ## copy the controller SQLite out of its volume to controller/chaos_state.export.db
 	$(CTL) cp api:/data/chaos_state.db controller/chaos_state.export.db

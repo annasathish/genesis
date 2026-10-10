@@ -18,7 +18,9 @@ x-common: &common
     - /var/run/docker.sock:/var/run/docker.sock    # Docker SDK: crash/restart/exec faults, health
     - chaos-data:/data                             # SQLite lives here, NOT on the Windows bind mount (file locking)
   environment:
-    CHAOS_DB_URL: sqlite:////data/chaos_state.db  # M2: read this instead of the hard-coded ./chaos_state.db
+    CHAOS_DB_URL: sqlite:////data/chaos_state.db  # M2/M4: read this instead of the hard-coded ./chaos_state.db
+    CHAOS_DB_PATH: sqlite:////data/chaos_state.db # M5 reporter.py reads this name
+    HEARTBEAT_FILE: /data/heartbeat.json          # M4: shared by api (writer) and watchdog (reader)
     SANDBOX_DIR: /sandbox
     SANDBOX_PROJECT: robotshop
     TARGET_LABEL: com.chaospilot.role=target       # only containers with this label may be faulted
@@ -42,9 +44,13 @@ services:
     mem_limit: 320m
 
   watchdog:
+    # M4's dead-man switch. Behind a profile until main.py writes heartbeats: with no heartbeat it treats the
+    # controller as dead every 5 s and clears all toxics / restarts stopped containers, undoing every injection.
+    # Start it with `make watchdog-up` once /data/heartbeat.json is being written.
     <<: *common
-    command: ["python", "-u", "watchdog/watchdog.py"]
-    mem_limit: 96m
+    command: ["python", "-u", "watchdog.py"]
+    profiles: [watchdog]
+    mem_limit: 128m
     depends_on: [api]
 
 volumes:
