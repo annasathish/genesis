@@ -1,5 +1,6 @@
 from .base import BaseFault
 from .container_crash import ContainerCrashFault
+from .disk_stress import DiskStressFault
 from .docker_client import (
     APIError,
     AsyncDockerClient,
@@ -12,6 +13,7 @@ __all__ = [
     "AsyncDockerClient",
     "BaseFault",
     "ContainerCrashFault",
+    "DiskStressFault",
     "NetworkLatencyFault",
     "DockerException",
     "NotFound",
