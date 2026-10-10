@@ -6,6 +6,7 @@
 #   bash sandbox/tests/test_tmpfs_caps.sh --fill   # also fill each mount past its cap and prove the cap holds
 #                                                   # (briefly breaks writes on that store; cleaned up after)
 set -u
+export MSYS_NO_PATHCONV=1   # Git Bash on Windows: stop it rewriting /data paths to C:/Program Files/Git/data
 cd "$(dirname "$0")/.." || exit 1
 
 FILL=0
