@@ -1,0 +1,72 @@
+# Martian Bank overrides (copied next to upstream compose by fetch.sh).
+# Same contract as the Robot Shop sandbox: localhost-only ports, mem caps, chaospilot labels, no auto-restart.
+# Note: the UI calls the APIs from the browser at localhost:8000/8001/5000, so those ports stay published (localhost only).
+name: martianbank
+
+x-target: &target
+  com.chaospilot.role: target
+
+services:
+  mongo:
+    image: mongo:6.0                      # upstream uses untagged `mongo` (latest, heavier)
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    restart: "no"
+    tmpfs:
+      - /data/db:size=128M,mode=1777
+    mem_limit: 448m
+    labels: {<<: *target, com.chaospilot.tier: database}
+
+  ui:
+    restart: "no"
+    ports: !override ["127.0.0.1:3000:3000"]
+    mem_limit: 512m                       # Vite dev server
+    labels: {<<: *target, com.chaospilot.tier: frontend}
+
+  nginx:
+    restart: "no"
+    ports: !override ["127.0.0.1:8080:8080"]
+    mem_limit: 64m
+    labels: {<<: *target, com.chaospilot.tier: gateway}
+
+  customer-auth:
+    restart: "no"
+    ports: !override ["127.0.0.1:8000:8000"]
+    mem_limit: 192m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  atm-locator:
+    restart: "no"
+    ports: !override ["127.0.0.1:8001:8001"]
+    mem_limit: 192m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  dashboard:
+    restart: "no"
+    ports: !override ["127.0.0.1:5000:5000"]
+    environment: {DB_URL: "mongodb://root:example@mongo:27017/", SERVICE_PROTOCOL: http}
+    mem_limit: 192m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  accounts:
+    restart: "no"
+    environment: {DB_URL: "mongodb://root:example@mongo:27017/", SERVICE_PROTOCOL: http}
+    mem_limit: 160m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  loan:
+    restart: "no"
+    environment: {DB_URL: "mongodb://root:example@mongo:27017/", SERVICE_PROTOCOL: http}
+    mem_limit: 160m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  transactions:
+    restart: "no"
+    environment: {DB_URL: "mongodb://root:example@mongo:27017/", SERVICE_PROTOCOL: http}
+    mem_limit: 160m
+    labels: {<<: *target, com.chaospilot.tier: service}
+
+  locust:
+    restart: "no"
+    ports: !override ["127.0.0.1:8089:8089"]
+    mem_limit: 192m
+    labels: {com.chaospilot.role: infra, com.chaospilot.tier: tooling}

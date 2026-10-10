@@ -1,0 +1,198 @@
+# M1 chaos overrides for Stan's Robot Shop.
+# docker-compose.yaml in this folder is the UNMODIFIED upstream file (instana/robot-shop @ 55292e2).
+# Compose merges this file on top automatically (`docker compose up` in this folder).
+# Requires Docker Compose >= 2.24.4 (for the `!override` tag on ports).
+#
+# Contract for M2-M5 (also in docs/M1_PLATFORM.md):
+#   project / network : robotshop  /  robotshop_robot-shop
+#   labels            : com.chaospilot.role = target | infra   (never inject into infra)
+#                       com.chaospilot.tier = gateway|service|worker|database|cache|queue|external|tooling
+#   toxiproxy proxies : sandbox/toxiproxy/toxiproxy.json  (name = <caller>_to_<dependency>)
+#   tmpfs (disk fill) : mongodb:/data/db 128M, redis:/data 64M, mysql:/chaos 32M (MySQL tmpdir)
+
+name: robotshop
+
+x-target-labels: &target
+  com.chaospilot.role: target
+
+services:
+
+  # ------------------------------------------------------------------ state stores
+  mongodb:
+    # small cache + no 100 MB journal preallocation, so the dataset fits a 128 MB tmpfs
+    command: ["--wiredTigerCacheSizeGB", "0.25", "--wiredTigerEngineConfigString", "log=(file_max=10MB,prealloc=false)"]
+    tmpfs:
+      - /data/db:size=128M,mode=1777
+    mem_limit: 448m          # tmpfs pages count against this: mongod (~250M) + full tmpfs (128M)
+    ports: ["127.0.0.1:27018:27017"]
+    healthcheck:
+      test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    labels:
+      <<: *target
+      com.chaospilot.tier: database
+
+  mysql:
+    # NOT on tmpfs: the cities dump is 64.6 MB of SQL (~150+ MB on disk with indexes, + 96 MB redo logs);
+    # in RAM that would cost ~300 MB and a 1-2 min re-import after every restart.
+    # Disk-exhaustion on MySQL instead fills its temp dir (/chaos, 32M tmpfs) -> filesorts/temp tables fail.
+    command: ["--performance-schema=OFF", "--innodb-buffer-pool-size=64M", "--max-connections=60", "--tmpdir=/chaos"]
+    tmpfs:
+      - /chaos:size=32M,mode=1777
+    volumes:
+      - mysql-data:/data      # named volume: data survives restarts, no re-import
+    mem_limit: 384m
+    ports: ["127.0.0.1:3307:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]   # TCP is off until the import finishes
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 120s
+    labels:
+      <<: *target
+      com.chaospilot.tier: database
+
+  redis:
+    # snapshot every 30 s if >= 1 change; when /data is full the snapshot fails and Redis refuses writes
+    command: ["redis-server", "--save", "30", "1"]
+    tmpfs:
+      - /data:size=64M,mode=1777
+    mem_limit: 160m
+    ports: ["127.0.0.1:6380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    labels:
+      <<: *target
+      com.chaospilot.tier: cache
+
+  rabbitmq:
+    mem_limit: 320m
+    ports: ["127.0.0.1:15672:15672"]   # management API (guest/guest): queue depth for M4
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    labels:
+      <<: *target
+      com.chaospilot.tier: queue
+
+  # ------------------------------------------------------------------ services (edges via Toxiproxy)
+  catalogue:
+    environment:
+      MONGO_URL: mongodb://toxiproxy:27017/catalogue         # catalogue_to_mongodb
+    mem_limit: 192m
+    healthcheck: {start_period: 30s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  user:
+    environment:
+      MONGO_URL: mongodb://toxiproxy:27117/users             # user_to_mongodb
+    mem_limit: 192m
+    healthcheck: {start_period: 30s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  cart:
+    environment:
+      REDIS_HOST: toxiproxy                                  # cart_to_redis (port fixed at 6379 in code)
+      CATALOGUE_HOST: toxiproxy                              # cart_to_catalogue (port fixed at 8080 in code)
+    mem_limit: 192m
+    healthcheck: {start_period: 30s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  shipping:
+    # upstream runs -Xmx768m; capped for the 5 GB host. If it exits with code 137, use -Xmx384m and mem_limit 576m.
+    command: ["java", "-Xms64m", "-Xmn64m", "-Xmx256m", "-XX:MaxMetaspaceSize=128m", "-XX:+UseSerialGC", "-jar", "shipping.jar"]
+    environment:
+      DB_HOST: toxiproxy:3306                                # shipping_to_mysql (used as jdbc:mysql://<DB_HOST>/cities)
+      CART_ENDPOINT: toxiproxy:18080                         # shipping_to_cart
+    mem_limit: 448m
+    healthcheck: {start_period: 120s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  ratings:
+    environment:
+      PDO_URL: mysql:host=toxiproxy;port=13306;dbname=ratings;charset=utf8mb4   # ratings_to_mysql
+    mem_limit: 192m
+    healthcheck: {start_period: 30s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  payment:
+    environment:
+      AMQP_HOST: toxiproxy                                   # payment_to_rabbitmq (pika default port 5672)
+      PAYMENT_GATEWAY: http://toxiproxy:18081/               # payment_to_gateway; upstream calls https://paypal.com (outside sandbox)
+    mem_limit: 192m
+    healthcheck: {start_period: 30s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: service
+
+  dispatch:
+    mem_limit: 64m
+    labels:
+      <<: *target
+      com.chaospilot.tier: worker
+
+  web:
+    ports: !override
+      - "127.0.0.1:8080:8080"
+    mem_limit: 128m
+    healthcheck: {start_period: 20s}
+    labels:
+      <<: *target
+      com.chaospilot.tier: gateway
+
+  # ------------------------------------------------------------------ added services
+  payment-gateway:
+    # local stand-in for the external payment provider; any HTTP 200 = payment accepted
+    image: nginx:1.27-alpine
+    mem_limit: 32m
+    networks: [robot-shop]
+    labels:
+      <<: *target
+      com.chaospilot.tier: external
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes: ["./toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro"]
+    ports: ["127.0.0.1:8474:8474"]   # control API
+    mem_limit: 64m
+    networks: [robot-shop]
+    labels:
+      com.chaospilot.role: infra
+      com.chaospilot.tier: tooling
+
+  load:
+    # replaces upstream rs-load (headless, no stats API) so M4 can poll /stats/requests
+    image: locustio/locust:${LOCUST_TAG:-2.31.8}
+    command: ["-f", "/mnt/locust/locustfile.py", "--host", "http://web:8080",
+              "--autostart", "--users", "${LOCUST_USERS:-10}", "--spawn-rate", "2"]
+    volumes: ["./locust:/mnt/locust:ro"]
+    ports: ["127.0.0.1:8089:8089"]   # UI + REST: /stats/requests, /swarm, /stop
+    mem_limit: 256m
+    networks: [robot-shop]
+    labels:
+      com.chaospilot.role: infra
+      com.chaospilot.tier: tooling
+
+volumes:
+  mysql-data:

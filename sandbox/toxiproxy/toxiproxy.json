@@ -1,0 +1,11 @@
+[
+  {"name": "catalogue_to_mongodb", "listen": "0.0.0.0:27017", "upstream": "mongodb:27017",       "enabled": true},
+  {"name": "user_to_mongodb",      "listen": "0.0.0.0:27117", "upstream": "mongodb:27017",       "enabled": true},
+  {"name": "cart_to_redis",        "listen": "0.0.0.0:6379",  "upstream": "redis:6379",          "enabled": true},
+  {"name": "cart_to_catalogue",    "listen": "0.0.0.0:8080",  "upstream": "catalogue:8080",      "enabled": true},
+  {"name": "shipping_to_mysql",    "listen": "0.0.0.0:3306",  "upstream": "mysql:3306",          "enabled": true},
+  {"name": "ratings_to_mysql",     "listen": "0.0.0.0:13306", "upstream": "mysql:3306",          "enabled": true},
+  {"name": "shipping_to_cart",     "listen": "0.0.0.0:18080", "upstream": "cart:8080",           "enabled": true},
+  {"name": "payment_to_rabbitmq",  "listen": "0.0.0.0:5672",  "upstream": "rabbitmq:5672",       "enabled": true},
+  {"name": "payment_to_gateway",   "listen": "0.0.0.0:18081", "upstream": "payment-gateway:80",  "enabled": true}
+]
