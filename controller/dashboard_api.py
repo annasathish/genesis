@@ -102,6 +102,12 @@ def get_rankings(db: Session = Depends(get_db)):
     rankings.sort(key=lambda x: x["score"], reverse=True)
     return rankings[:10]
 
+import json
+import google.generativeai as genai
+
+# Global cache to prevent spamming the LLM every 2 seconds
+LLM_INSIGHT_CACHE = {}
+
 @router.get("/api/v1/business-insights")
 def get_insights(db: Session = Depends(get_db)):
     intent = db.query(ExperimentIntent).order_by(ExperimentIntent.id.desc()).first()
@@ -117,12 +123,50 @@ def get_insights(db: Session = Depends(get_db)):
             "roi_recommendation": "System healthy. Monitor for architectural drift."
         }
         
+    intent_id = intent.id
     target = intent.target_service
+    fault_type = intent.fault_type
+    
+    # Return cached response if we already generated it for this experiment
+    if intent_id in LLM_INSIGHT_CACHE:
+        return LLM_INSIGHT_CACHE[intent_id]
+        
     is_active = intent.status == "running"
+    
+    # Try LLM if enabled
+    if os.environ.get("USE_LLM", "false").lower() == "true":
+        try:
+            genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "DUMMY_KEY"))
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            
+            prompt = f"""
+            You are a Business Metrics Architect and Site Reliability Engineer. 
+            A chaos experiment is currently targeting the e-commerce microservice '{target}' with fault '{fault_type}'.
+            Estimate the business and financial impact of this failure. 
+            Return strictly a JSON object with these keys:
+            - churn_risk (string: HIGH, MEDIUM, LOW)
+            - funnel_impact (string: 1-2 sentences describing user experience impact)
+            - dau_impact (string: e.g. "15% Bounce Rate Spike")
+            - revenue_at_risk (string: e.g. "$45,000")
+            - sla_depletion (string: e.g. "4.2%")
+            - support_volume (string: 1 sentence predicted support ticket surge)
+            - roi_recommendation (string: 1 sentence architectural fix to save money)
+            Do not include markdown or backticks.
+            """
+            response = model.generate_content(prompt)
+            raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
+            insight_data = json.loads(raw_text)
+            
+            LLM_INSIGHT_CACHE[intent_id] = insight_data
+            return insight_data
+        except Exception as e:
+            print(f"Dashboard LLM generation failed, falling back to heuristics: {e}")
+            
+    # Fallback Heuristics
     base_rev_per_min = 2500
     
     if target in ["payment", "cart", "redis"]:
-        return {
+        insight_data = {
             "churn_risk": "HIGH",
             "funnel_impact": "Critical Failure in Checkout Funnel. 100% Cart Abandonment.",
             "dau_impact": "15% Bounce Rate Spike",
@@ -132,7 +176,7 @@ def get_insights(db: Session = Depends(get_db)):
             "roi_recommendation": f"Implement Redis-backed Circuit Breaker on {target.upper()} to save est. $45,000 in annualized SLA fines."
         }
     elif target in ["rabbitmq", "shipping", "mongodb"]:
-        return {
+        insight_data = {
             "churn_risk": "MEDIUM",
             "funnel_impact": "Asynchronous processing delayed. Orders stuck in 'Pending'.",
             "dau_impact": "5% Bounce Rate Spike",
@@ -142,7 +186,7 @@ def get_insights(db: Session = Depends(get_db)):
             "roi_recommendation": f"Deploy dead-letter queue for {target.upper()} to reduce cloud waste by 12%."
         }
     else:
-        return {
+        insight_data = {
             "churn_risk": "LOW",
             "funnel_impact": "Minor UI degradation. Core funnels operational.",
             "dau_impact": "1% Bounce Rate Spike",
@@ -151,3 +195,7 @@ def get_insights(db: Session = Depends(get_db)):
             "support_volume": "No significant support volume predicted.",
             "roi_recommendation": "System degrades gracefully. No immediate architectural changes required."
         }
+        
+    LLM_INSIGHT_CACHE[intent_id] = insight_data
+    return insight_data
+
