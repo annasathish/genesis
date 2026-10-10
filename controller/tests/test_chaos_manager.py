@@ -124,7 +124,7 @@ async def test_prevent_concurrent_fault_on_same_target(db_session_factory, mock_
     # Second execution on same target must be rejected
     with pytest.raises(RuntimeError) as exc_info:
         await manager.execute_fault("cart", "container_crash", ttl_seconds=60)
-    assert "already has an active running fault" in str(exc_info.value)
+    assert "already has an active pending or running fault" in str(exc_info.value)
 
     await manager.rollback(res["intent_id"])
 

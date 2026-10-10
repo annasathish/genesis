@@ -73,13 +73,13 @@ class ChaosManager:
                 db.query(ExperimentIntent)
                 .filter(
                     ExperimentIntent.target_service == target,
-                    ExperimentIntent.status == "running",
+                    ExperimentIntent.status.in_(["pending", "running"]),
                 )
                 .first()
             )
             if active:
                 raise RuntimeError(
-                    f"Target '{target}' already has an active running fault (intent #{active.id})"
+                    f"Target '{target}' already has an active pending or running fault (intent #{active.id})"
                 )
 
             # 4. Intent logging before injection (status="pending")

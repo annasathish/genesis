@@ -3,10 +3,11 @@
 # Every target is a plain docker compose command, so the same lines also work typed by hand in cmd/PowerShell.
 
 SB     := docker compose -f sandbox/docker-compose.yaml -f sandbox/docker-compose.override.yml
-CTL    := docker compose -f controller/docker-compose.yml
+ENV_FILE ?= .env
+CTL    := docker compose --env-file $(ENV_FILE) -f controller/docker-compose.yml
 BK_DIR := sandbox-backup/martian-bank-demo
 BK     := docker compose --project-directory $(BK_DIR) -f $(BK_DIR)/docker-compose.yaml -f $(BK_DIR)/docker-compose.override.yml
-PYTHON ?= python
+PYTHON ?= python3
 API    ?= http://127.0.0.1:8000
 
 .PHONY: help pull up down nuke sandbox-up controller-up ps logs stats verify test-caps test-fill \
@@ -87,7 +88,7 @@ backup-down:
 
 # ------------------------------------------------------------------ team-owned targets
 map:            ## M2
-	curl -s -X POST $(API)/api/v1/map
+	curl --fail-with-body --silent --show-error -X POST $(API)/api/v1/map
 
 baseline:       ## M4: steady-state capture inside the controller container (writes controller/baseline.json)
 	$(CTL) exec api python baseline.py --duration $(or $(dur),600) --interval 5
@@ -96,16 +97,17 @@ watchdog-up:    ## M4: dead-man watchdog. Off by default until main.py writes he
 	$(CTL) --profile watchdog up -d watchdog
 
 inject:         ## M3: usage make inject fault=container_crash target=cart
-	curl -s -X POST "$(API)/api/v1/inject" -H "Content-Type: application/json" -d '{"fault_type": "$(fault)", "target": "$(target)"}'
+	curl --fail-with-body --silent --show-error -X POST "$(API)/api/v1/inject" -H "Content-Type: application/json" -d '{"fault_type": "$(fault)", "target": "$(target)", "ttl_seconds": $(or $(ttl),60)}'
 
 stop:           ## M3/M4: kill switch + rollback
-	curl -s -X POST "$(API)/api/v1/safety/trip?reason=ManualStop"
+	curl --fail-with-body --silent --show-error -X POST "$(API)/api/v1/safety/trip?reason=ManualStop"
 
 report:         ## M5
 	$(CTL) exec api python cli.py report
 
-test:           ## unit tests (host Python; needs controller/requirements.txt installed)
-	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v
+test:           ## unit tests (install controller/requirements-dev.txt first)
+	cd controller && $(PYTHON) -m pytest -q tests
+	$(PYTHON) -m pytest -q tests
 
 controller-dev: ## run the API on the host instead of Docker (debugging only)
 	cd controller && $(PYTHON) -m uvicorn main:app --host 127.0.0.1 --port 8000

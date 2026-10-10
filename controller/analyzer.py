@@ -10,10 +10,9 @@ Rules enforced by design:
 """
 
 import json
-import os
 from typing import Optional
 
-import google.generativeai as genai
+from ai_client import generate_json
 
 # ── Fixed Vocabulary ────────────────────────────────────────────────
 FIXED_VOCABULARY = [
@@ -22,16 +21,6 @@ FIXED_VOCABULARY = [
     "Add Retries",
     "Implement Circuit Breaker",
 ]
-
-MODEL_NAME = "gemini-2.5-flash"
-
-
-def _configure_genai() -> None:
-    """Configure the Gemini SDK (idempotent)."""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if api_key:
-        genai.configure(api_key=api_key)
-
 
 def analyze_experiment(
     fault_type: str,
@@ -88,8 +77,6 @@ def _llm_analysis(
     score_out_of_10: float,
 ) -> dict:
     """Call Gemini with strict constraints."""
-    _configure_genai()
-
     prompt = f"""You are an expert Site-Reliability Engineer reviewing a chaos experiment.
 
 STRICT RULES:
@@ -109,9 +96,7 @@ Respond in this exact JSON format (no markdown, no extra text):
 {{"explanation": "...", "recommended_fix": "..."}}
 """
 
-    model = genai.GenerativeModel(MODEL_NAME)
-    response = model.generate_content(prompt)
-    raw = response.text.strip().removeprefix("```json").removesuffix("```").strip()
+    raw = generate_json(prompt).strip().removeprefix("```json").removesuffix("```").strip()
     parsed = json.loads(raw)
 
     # Enforce vocabulary constraint

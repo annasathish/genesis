@@ -90,22 +90,49 @@ fi
 log_step "3" "Capturing Steady-State Baseline Bands (make baseline)"
 if [ "${TEST_MODE}" = "true" ]; then
     log_warn "TEST_MODE active: Running fast 10-second baseline capture..."
-    curl -s -X POST "${CONTROLLER_URL}/api/v1/baseline?test_mode=true"
-    sleep 12
+    curl -fsS -X POST "${CONTROLLER_URL}/api/v1/baseline?test_mode=true"
+    BASELINE_READY=false
+    for i in {1..20}; do
+        STATUS=$(curl -fsS "${CONTROLLER_URL}/api/v1/safety/status")
+        if echo "$STATUS" | grep -q '"baseline_capture":{"state":"complete"' && \
+           echo "$STATUS" | grep -q '"baseline_loaded":true'; then
+            BASELINE_READY=true
+            break
+        fi
+        if echo "$STATUS" | grep -q '"baseline_capture":{"state":"failed"'; then
+            log_error "Baseline capture failed: ${STATUS}"
+            exit 1
+        fi
+        sleep 2
+    done
+    if [ "${BASELINE_READY}" != "true" ]; then
+        log_error "Baseline capture did not complete within 40 seconds."
+        exit 1
+    fi
 else
     log_info "Triggering 10-minute steady-state baseline capture (600s)..."
-    curl -s -X POST "${CONTROLLER_URL}/api/v1/baseline?duration=600&interval=5"
+    curl -fsS -X POST "${CONTROLLER_URL}/api/v1/baseline?duration=600&interval=5"
     log_info "Waiting for baseline collection to complete..."
-    # Poll until baseline file is generated or ready
+    # Poll the capture task, not just an older baseline file from a previous run.
+    BASELINE_READY=false
     for i in {1..125}; do
-        STATUS=$(curl -s "${CONTROLLER_URL}/api/v1/safety/status" || echo "{}")
-        LOADED=$(echo "$STATUS" | grep -o '"baseline_loaded":true' || true)
-        if [ -n "$LOADED" ]; then
+        STATUS=$(curl -fsS "${CONTROLLER_URL}/api/v1/safety/status")
+        if echo "$STATUS" | grep -q '"baseline_capture":{"state":"complete"' && \
+           echo "$STATUS" | grep -q '"baseline_loaded":true'; then
             log_info "Steady-state baseline successfully established and loaded!"
+            BASELINE_READY=true
             break
+        fi
+        if echo "$STATUS" | grep -q '"baseline_capture":{"state":"failed"'; then
+            log_error "Baseline capture failed: ${STATUS}"
+            exit 1
         fi
         sleep 5
     done
+    if [ "${BASELINE_READY}" != "true" ]; then
+        log_error "Baseline capture did not complete within the expected 10-minute window."
+        exit 1
+    fi
 fi
 
 # ------------------------------------------------------------------------------
@@ -115,11 +142,11 @@ log_step "4" "Injecting Fault: ratings container crash (Graceful Degradation)"
 log_info "Crashing 'ratings' to prove UI graceful degradation without tripping Kill Switch..."
 
 if command -v make >/dev/null 2>&1 && make -n inject >/dev/null 2>&1; then
-    make inject fault=container_crash target=ratings
+    make inject fault=container_crash target=ratings ttl=30
 else
-    curl -s -X POST "${CONTROLLER_URL}/api/v1/inject" \
+    curl -fsS -X POST "${CONTROLLER_URL}/api/v1/inject" \
         -H "Content-Type: application/json" \
-        -d '{"fault_type": "container_crash", "target": "ratings"}' || true
+        -d '{"fault_type": "container_crash", "target": "ratings", "ttl_seconds": 30}'
 fi
 
 log_info "Observing system telemetry for 15 seconds (Kill Switch should remain ARMED)..."
@@ -129,6 +156,8 @@ for i in {1..3}; do
     echo "Current Safety Status: ${SAFETY_STATUS}"
 done
 log_info "'ratings' degradation tolerated. Kill switch did NOT fire (Expected Behavior)."
+log_info "Waiting for the 30-second experiment TTL to roll ratings back before testing cart..."
+sleep 20
 
 # ------------------------------------------------------------------------------
 # STEP 5: Fault Injection 2 - Critical Failure (cart)
@@ -137,11 +166,11 @@ log_step "5" "Injecting Fault: cart container crash (Critical Service Failure)"
 log_info "Crashing Tier-1 critical service 'cart' to demonstrate automated Kill Switch protection..."
 
 if command -v make >/dev/null 2>&1 && make -n inject >/dev/null 2>&1; then
-    make inject fault=container_crash target=cart
+    make inject fault=container_crash target=cart ttl=30
 else
-    curl -s -X POST "${CONTROLLER_URL}/api/v1/inject" \
+    curl -fsS -X POST "${CONTROLLER_URL}/api/v1/inject" \
         -H "Content-Type: application/json" \
-        -d '{"fault_type": "container_crash", "target": "cart"}' || true
+        -d '{"fault_type": "container_crash", "target": "cart", "ttl_seconds": 30}'
 fi
 
 # ------------------------------------------------------------------------------
@@ -157,6 +186,7 @@ for i in {1..15}; do
     echo "Telemetry window #$i check: ${SAFETY_STATUS}"
     
     if echo "$SAFETY_STATUS" | grep -q '"kill_switch_state":"TRIPPED"' || \
+       echo "$SAFETY_STATUS" | grep -q '"kill_switch_state":"RECOVERING"' || \
        echo "$SAFETY_STATUS" | grep -q '"kill_switch_state":"RECOVERED"'; then
         log_info "KILL SWITCH FIRED AND INITIATED EMERGENCY ROLLBACK!"
         TRIPPED=true
@@ -166,7 +196,7 @@ done
 
 if [ "$TRIPPED" = "false" ]; then
     log_warn "Kill switch did not trip within timeout. Triggering operator failsafe..."
-    curl -s -X POST "${CONTROLLER_URL}/api/v1/safety/trip?reason=DemoTimeoutFailsafe"
+    curl -fsS -X POST "${CONTROLLER_URL}/api/v1/safety/trip?reason=DemoTimeoutFailsafe"
 fi
 
 log_info "Waiting for container recovery and telemetry stabilization..."

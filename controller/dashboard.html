@@ -30,7 +30,7 @@
         <div class="flex space-x-6">
             <div class="text-right">
                 <p class="text-gray-400 text-xs uppercase tracking-wider">Kill Switch</p>
-                <p class="font-bold text-lg" :class="metrics.kill_switch_open ? 'text-red-500' : 'text-green-500'" x-text="metrics.kill_switch_open ? 'OPEN (FIRED)' : 'CLOSED (ARMED)'"></p>
+                    <p class="font-bold text-lg" :class="metrics.kill_switch_open ? 'text-red-500' : 'text-green-500'" x-text="metrics.kill_switch_state || 'WAITING'"></p>
             </div>
             <div class="text-right">
                 <p class="text-gray-400 text-xs uppercase tracking-wider">System Error Rate</p>
@@ -67,6 +67,36 @@
                     </template>
                 </div>
                 <p class="text-gray-400 text-xs mt-6 italic">Target map automatically updates based on M2 Mapper constraints.</p>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-5 border border-cyan-700 shadow-lg">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-lg font-bold text-gray-100">Judge Console</h2>
+                    <span class="text-xs font-bold rounded-full px-3 py-1"
+                          :class="safety.is_safe_to_inject ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'"
+                          x-text="safety.is_safe_to_inject ? 'SAFE TO RUN' : 'GUARDED'"></span>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Preview the dependency-aware experiment, review its hypothesis, then approve one bounded run.</p>
+                <p class="text-xs text-yellow-200 mt-2" x-show="!safety.is_safe_to_inject" x-text="safety.safety_reason"></p>
+                <div class="flex flex-wrap gap-2 mt-4">
+                    <button @click="previewExperiment()" :disabled="busy || !safety.baseline_loaded"
+                            class="rounded bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 px-3 py-2 text-sm font-semibold">
+                        Preview next experiment
+                    </button>
+                    <button @click="runPreview()" :disabled="busy || !safety.is_safe_to_inject || !preview"
+                            class="rounded bg-fuchsia-700 hover:bg-fuchsia-600 disabled:opacity-40 px-3 py-2 text-sm font-semibold">
+                        Approve & run (30s)
+                    </button>
+                    <button @click="stopExperiments()" :disabled="busy"
+                            class="rounded border border-red-500 text-red-300 hover:bg-red-950 disabled:opacity-40 px-3 py-2 text-sm font-semibold">
+                        Emergency stop
+                    </button>
+                </div>
+                <div class="mt-4 rounded bg-black/30 p-3 text-sm" x-show="preview">
+                    <p><span class="text-gray-400">Experiment:</span> <strong x-text="preview ? `${preview.fault_type} → ${preview.display_target || preview.target_service}` : ''"></strong></p>
+                    <p class="mt-1"><span class="text-gray-400">Why this test:</span> <span x-text="preview ? (preview.reasoning || preview.reason || 'Ranked from the dependency map.') : ''"></span></p>
+                    <p class="mt-1 text-cyan-200" x-text="preview ? (preview.hypothesis || '') : ''"></p>
+                </div>
+                <p class="text-xs text-gray-300 mt-3 min-h-5" x-text="controlMessage"></p>
             </div>
         </div>
 
@@ -109,7 +139,7 @@
                     <svg class="w-5 h-5 mr-2 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                     Stakeholder & ROI Hub
                 </h2>
-                <p class="text-indigo-200 text-xs mb-4">Real-time financial & business impact mapping driven by AI Analysis.</p>
+                <p class="text-indigo-200 text-xs mb-4">AI explains the observed sandbox impact. Business figures are labeled as estimates because this demo has no production data.</p>
                 
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="bg-black/30 rounded p-3 border border-indigo-700/50">
@@ -136,6 +166,7 @@
                         <p class="text-sm text-indigo-100 italic" x-text="insights.roi_recommendation"></p>
                     </div>
                 </div>
+                <p class="text-indigo-300/80 text-xs mt-4" x-text="insights.impact_basis"></p>
             </div>
         </div>
     </main>
@@ -143,32 +174,98 @@
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('chaosDashboard', () => ({
-                metrics: { error_rate: 0, p95_latency: 0, kill_switch_open: false, status_badge: 'LOADING...' },
+                metrics: { error_rate: 0, p95_latency: 0, kill_switch_open: false, kill_switch_state: 'WAITING', status_badge: 'LOADING...' },
                 rankings: [],
-                insights: { churn_risk: '-', funnel_impact: '-', revenue_at_risk: '-', support_volume: '-', roi_recommendation: '-' },
+                insights: { churn_risk: '-', funnel_impact: '-', revenue_at_risk: '-', support_volume: '-', roi_recommendation: '-', impact_basis: '' },
+                safety: { is_safe_to_inject: false, baseline_loaded: false, safety_reason: 'Waiting for telemetry.' },
+                preview: null,
+                busy: false,
+                controlMessage: '',
                 chart: null,
                 
                 init() {
                     this.initChart();
                     this.fetchData();
-                    setInterval(() => this.fetchData(), 2000);
+                    setInterval(() => this.fetchData(), 5000);
                 },
 
                 async fetchData() {
                     try {
-                        const [mRes, rRes, iRes] = await Promise.all([
+                        const [mRes, rRes, iRes, sRes] = await Promise.all([
                             fetch('/api/v1/metrics'),
                             fetch('/api/v1/rankings'),
-                            fetch('/api/v1/business-insights')
+                            fetch('/api/v1/business-insights'),
+                            fetch('/api/v1/safety/status')
                         ]);
                         
                         this.metrics = await mRes.json();
                         this.rankings = await rRes.json();
                         this.insights = await iRes.json();
+                        this.safety = await sRes.json();
                         
                         this.updateChart(this.metrics.timestamp, this.metrics.p95_latency);
                     } catch (e) {
                         console.error('Fetch error:', e);
+                    }
+                },
+
+                async previewExperiment() {
+                    this.busy = true;
+                    this.controlMessage = 'Asking the planner to rank experiments from the current dependency map…';
+                    this.preview = null;
+                    try {
+                        const response = await fetch('/api/v1/plan', { method: 'POST' });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || 'Planner request failed.');
+                        if (!data.candidates || !data.candidates.length) throw new Error('No eligible experiments were returned.');
+                        this.preview = data.candidates[0];
+                        this.controlMessage = 'Review the target, reason and hypothesis. No fault has run yet.';
+                    } catch (error) {
+                        this.controlMessage = error.message;
+                    } finally {
+                        this.busy = false;
+                    }
+                },
+
+                async runPreview() {
+                    if (!this.preview || !this.safety.is_safe_to_inject) return;
+                    this.busy = true;
+                    this.controlMessage = 'Running the approved experiment with a 30-second automatic rollback…';
+                    try {
+                        const response = await fetch('/api/v1/inject', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                fault_type: this.preview.fault_type,
+                                target: this.preview.target_service,
+                                ttl_seconds: 30
+                            })
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail?.safety_reason || data.detail || 'Experiment was rejected.');
+                        this.controlMessage = `Intent #${data.result.intent_id} is active. The controller will roll it back automatically.`;
+                        this.preview = null;
+                        await this.fetchData();
+                    } catch (error) {
+                        this.controlMessage = error.message;
+                    } finally {
+                        this.busy = false;
+                    }
+                },
+
+                async stopExperiments() {
+                    if (!window.confirm('Stop all active sandbox experiments and restore the sandbox?')) return;
+                    this.busy = true;
+                    try {
+                        const response = await fetch('/api/v1/safety/trip?reason=JudgeConsole', { method: 'POST' });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || 'Emergency stop failed.');
+                        this.controlMessage = `Rollback requested. ${data.rollback.intent_ids.length} active intent(s) were stopped.`;
+                        await this.fetchData();
+                    } catch (error) {
+                        this.controlMessage = error.message;
+                    } finally {
+                        this.busy = false;
                     }
                 },
                 
