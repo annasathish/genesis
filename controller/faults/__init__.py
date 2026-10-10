@@ -6,11 +6,13 @@ from .docker_client import (
     DockerException,
     NotFound,
 )
+from .network_latency import NetworkLatencyFault
 
 __all__ = [
     "AsyncDockerClient",
     "BaseFault",
     "ContainerCrashFault",
+    "NetworkLatencyFault",
     "DockerException",
     "NotFound",
     "APIError",
