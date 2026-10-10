@@ -82,6 +82,49 @@ class EvaluationResult:
     details: Dict[str, Any] = field(default_factory=dict)
 
 
+def is_approved_sandbox_container(
+    c_name: str,
+    labels: Optional[Dict[str, str]],
+    sandbox_project: str,
+    allowed_services: Set[str],
+    container_id: Optional[str] = None,
+    allowed_container_ids: Optional[Set[str]] = None,
+) -> bool:
+    """
+    Strictly verifies that a container belongs to the approved Robot Shop sandbox.
+
+    Verification Rules:
+    1. If `com.docker.compose.project` is present, it must exactly match `sandbox_project`;
+       mismatched project labels are rejected immediately.
+    2. Compose-managed containers require BOTH:
+       - `com.docker.compose.project == sandbox_project`
+       - A valid `com.docker.compose.service` present in `allowed_services`.
+       Missing, empty, or unapproved service labels are rejected immediately.
+    3. Unlabeled containers (lacking `com.docker.compose.project`) are NEVER approved
+       solely based on name prefixes (e.g. 'robot-shop-') or generic service names (e.g. 'cart').
+       They are only approved if explicit verifiable ownership is provided via
+       `allowed_container_ids` matching `container_id`. Otherwise, rejected.
+    """
+    labels = labels or {}
+    c_project = labels.get("com.docker.compose.project")
+    c_service = labels.get("com.docker.compose.service")
+
+    # 1 & 2. Compose-managed containers: require matching project AND valid service
+    if c_project:
+        if c_project != sandbox_project:
+            return False
+        if c_service and allowed_services and c_service in allowed_services:
+            return True
+        return False
+
+    # 3. Unlabeled containers: reject loose names/prefixes; require verifiable container ID allowlist
+    if allowed_container_ids and container_id:
+        if container_id in allowed_container_ids or container_id[:12] in allowed_container_ids:
+            return True
+
+    return False
+
+
 class KillSwitch:
     """
     Evaluates telemetry against baseline bands and executes emergency rollbacks.
@@ -95,6 +138,7 @@ class KillSwitch:
         toxiproxy_url: Optional[str] = None,
         sandbox_project: Optional[str] = None,
         allowed_services: Optional[List[str]] = None,
+        allowed_container_ids: Optional[List[str]] = None,
         poll_interval_seconds: float = 5.0,
         blind_guardrail_timeout_seconds: float = 15.0,
         consecutive_windows_required: int = 2,
@@ -109,6 +153,12 @@ class KillSwitch:
         ).rstrip("/")
         self.sandbox_project = sandbox_project or os.environ.get("SANDBOX_PROJECT", "robot-shop")
         self.allowed_services = set(allowed_services or DEFAULT_SANDBOX_SERVICES)
+        env_cids = [
+            cid.strip()
+            for cid in os.environ.get("ALLOWED_CONTAINER_IDS", "").split(",")
+            if cid.strip()
+        ]
+        self.allowed_container_ids: Set[str] = set(allowed_container_ids or env_cids)
         self.poll_interval = poll_interval_seconds
         self.blind_guardrail_timeout = blind_guardrail_timeout_seconds
         self.consecutive_windows_required = consecutive_windows_required
@@ -125,15 +175,20 @@ class KillSwitch:
 
         # Baseline thresholds loaded in memory
         self.baseline_bands: Optional[Dict[str, Any]] = None
+        self._baseline_mtime: Optional[float] = None
         self.load_baseline()
 
     def load_baseline(self) -> Optional[Dict[str, Any]]:
-        """Loads baseline.json if present on disk."""
+        """Loads or reloads baseline.json if present on disk."""
         if os.path.exists(self.baseline_path):
             try:
+                mtime = os.path.getmtime(self.baseline_path)
+                if self.baseline_bands is not None and self._baseline_mtime == mtime:
+                    return self.baseline_bands
                 with open(self.baseline_path, "r", encoding="utf-8") as f:
                     self.baseline_bands = json.load(f)
-                logger.info("Kill Switch loaded baseline from %s", self.baseline_path)
+                self._baseline_mtime = mtime
+                logger.info("Kill Switch loaded baseline from %s (mtime=%.1f)", self.baseline_path, mtime)
                 return self.baseline_bands
             except Exception as exc:
                 logger.warning("Failed to load baseline from %s: %s", self.baseline_path, exc)
@@ -143,7 +198,13 @@ class KillSwitch:
         """
         Returns (max_error_rate, max_p95_latency_ms).
         Defaults: error_rate > 0.05 (5%), p95 > 5 * baseline_p95 (or 250ms fallback).
+        Automatically reloads baseline if baseline.json was created or modified on disk.
         """
+        if os.path.exists(self.baseline_path):
+            current_mtime = os.path.getmtime(self.baseline_path)
+            if self.baseline_bands is None or self._baseline_mtime != current_mtime:
+                self.load_baseline()
+
         if self.baseline_bands:
             thresholds = self.baseline_bands.get("kill_switch_thresholds", {})
             max_err = thresholds.get("max_error_rate", 0.05)
@@ -328,18 +389,17 @@ class KillSwitch:
         for c in containers:
             c_name = c.name
             labels = c.labels or {}
-            c_project = labels.get("com.docker.compose.project")
+            c_id = getattr(c, "id", None)
 
             # Check if container belongs strictly to sandbox
-            is_sandbox = False
-            if c_project and c_project == self.sandbox_project:
-                is_sandbox = True
-            elif self.sandbox_project and c_name.startswith(f"{self.sandbox_project}_") or c_name.startswith(f"{self.sandbox_project}-"):
-                is_sandbox = True
-            elif any(svc in c_name for svc in self.allowed_services):
-                is_sandbox = True
-
-            if not is_sandbox:
+            if not is_approved_sandbox_container(
+                c_name,
+                labels,
+                self.sandbox_project,
+                self.allowed_services,
+                container_id=c_id,
+                allowed_container_ids=self.allowed_container_ids,
+            ):
                 continue
 
             if c.status != "running":

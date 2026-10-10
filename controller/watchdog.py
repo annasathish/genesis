@@ -33,6 +33,7 @@ if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 from heartbeat import HeartbeatManager
+from kill_switch import is_approved_sandbox_container
 
 try:
     import docker
@@ -76,6 +77,7 @@ class DeadManWatchdog:
         toxiproxy_url: Optional[str] = None,
         sandbox_project: Optional[str] = None,
         allowed_services: Optional[List[str]] = None,
+        allowed_container_ids: Optional[List[str]] = None,
         db_path: Optional[str] = None,
     ):
         self.heartbeat_manager = HeartbeatManager(heartbeat_file)
@@ -92,6 +94,14 @@ class DeadManWatchdog:
         self.sandbox_project = sandbox_project or os.environ.get("SANDBOX_PROJECT", "robot-shop")
         self.allowed_services: Set[str] = set(
             allowed_services or DEFAULT_SANDBOX_SERVICES
+        )
+        env_cids = [
+            cid.strip()
+            for cid in os.environ.get("ALLOWED_CONTAINER_IDS", "").split(",")
+            if cid.strip()
+        ]
+        self.allowed_container_ids: Set[str] = set(
+            allowed_container_ids or env_cids
         )
         self.db_path = db_path or os.path.join(CURRENT_DIR, "chaos_state.db")
         self._running = False
@@ -160,21 +170,17 @@ class DeadManWatchdog:
             for c in containers:
                 c_name = c.name
                 labels = c.labels or {}
-                c_project = labels.get("com.docker.compose.project")
+                c_id = getattr(c, "id", None)
 
                 # Strictly verify membership in sandbox
-                is_target_sandbox = False
-                if c_project and c_project == self.sandbox_project:
-                    is_target_sandbox = True
-                elif self.sandbox_project and (
-                    c_name.startswith(f"{self.sandbox_project}_")
-                    or c_name.startswith(f"{self.sandbox_project}-")
+                if not is_approved_sandbox_container(
+                    c_name,
+                    labels,
+                    self.sandbox_project,
+                    self.allowed_services,
+                    container_id=c_id,
+                    allowed_container_ids=self.allowed_container_ids,
                 ):
-                    is_target_sandbox = True
-                elif any(svc in c_name for svc in self.allowed_services):
-                    is_target_sandbox = True
-
-                if not is_target_sandbox:
                     continue
 
                 if c.status != "running":

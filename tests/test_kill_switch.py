@@ -149,37 +149,74 @@ class TestKillSwitch(unittest.TestCase):
         self.assertEqual(res3.reason, TripReason.BLIND_GUARDRAIL.value)
 
     def test_rollback_safety_strictly_scopes_to_sandbox_containers(self):
-        # Mock Docker client with 3 containers:
-        # 1: stopped sandbox container (robot-shop-cart)
-        # 2: running sandbox container (robot-shop-web)
+        # Mock Docker client with containers:
+        # 1: stopped verified sandbox container (robot-shop-cart)
+        # 2: running verified sandbox container (robot-shop-web)
         # 3: stopped personal/host container (personal-blog-db) -> MUST NOT BE TOUCHED!
+        # 4: stopped container with matching project but MISSING service label -> MUST NOT BE TOUCHED!
+        # 5: stopped unlabeled container with misleading prefix -> MUST NOT BE TOUCHED!
+        # 6: stopped container with matching project but UNAPPROVED service -> MUST NOT BE TOUCHED!
         mock_c1 = MagicMock()
         mock_c1.name = "robot-shop-cart-1"
         mock_c1.status = "exited"
-        mock_c1.labels = {"com.docker.compose.project": "robot-shop"}
+        mock_c1.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "cart",
+        }
 
         mock_c2 = MagicMock()
         mock_c2.name = "robot-shop-web-1"
         mock_c2.status = "running"
-        mock_c2.labels = {"com.docker.compose.project": "robot-shop"}
+        mock_c2.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "web",
+        }
 
         mock_c3 = MagicMock()
         mock_c3.name = "personal-blog-db"
         mock_c3.status = "exited"
         mock_c3.labels = {"com.docker.compose.project": "personal-app"}
 
+        mock_c4 = MagicMock()
+        mock_c4.name = "robot-shop-unlabeled-svc"
+        mock_c4.status = "exited"
+        mock_c4.labels = {"com.docker.compose.project": "robot-shop"}
+
+        mock_c5 = MagicMock()
+        mock_c5.name = "robot-shop-cart-misleading"
+        mock_c5.status = "exited"
+        mock_c5.labels = {}
+
+        mock_c6 = MagicMock()
+        mock_c6.name = "robot-shop-tool"
+        mock_c6.status = "exited"
+        mock_c6.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "unapproved-debugger",
+        }
+
         mock_client = MagicMock()
-        mock_client.containers.list.return_value = [mock_c1, mock_c2, mock_c3]
+        mock_client.containers.list.return_value = [
+            mock_c1,
+            mock_c2,
+            mock_c3,
+            mock_c4,
+            mock_c5,
+            mock_c6,
+        ]
 
         with patch("kill_switch.docker") as mock_docker:
             mock_docker.from_env.return_value = mock_client
             restarted = self.ks._sync_revive_sandbox_containers()
 
-            # Assert only stopped sandbox container was started
+            # Assert only verified stopped sandbox container was started
             self.assertEqual(restarted, ["robot-shop-cart-1"])
             self.assertTrue(mock_c1.start.called)
             self.assertFalse(mock_c2.start.called)
             self.assertFalse(mock_c3.start.called)
+            self.assertFalse(mock_c4.start.called)
+            self.assertFalse(mock_c5.start.called)
+            self.assertFalse(mock_c6.start.called)
 
     def test_toxiproxy_toxic_purge_on_rollback(self):
         async def run_test():
@@ -241,6 +278,158 @@ class TestKillSwitch(unittest.TestCase):
             self.assertEqual(mock_intent.status, "aborted")
             self.assertTrue(mock_session.commit.called)
             self.assertTrue(mock_session.add.called)
+
+    def test_lazy_reload_baseline_when_created_after_startup(self):
+        """
+        Regression test: Verify KillSwitch reloads baseline.json if it was created
+        or modified AFTER the controller started up.
+        """
+        late_baseline_path = os.path.join(self.temp_dir.name, "late_baseline.json")
+        ks_late = KillSwitch(
+            baseline_path=late_baseline_path,
+            db_path=self.db_file,
+        )
+
+        # 1. At startup before baseline is created
+        self.assertIsNone(ks_late.baseline_bands)
+        err_def, p95_def = ks_late.get_thresholds()
+        self.assertEqual(err_def, 0.05)
+        self.assertEqual(p95_def, 500.0)
+
+        # 2. Baseline is created later by make baseline
+        time.sleep(0.02)
+        late_data = {
+            "p95_latency_ms": {"mean": 60.0},
+            "error_rate": {"mean": 0.005},
+            "kill_switch_thresholds": {
+                "max_error_rate": 0.07,
+                "p95_latency_threshold_ms": 300.0,
+            },
+        }
+        with open(late_baseline_path, "w", encoding="utf-8") as f:
+            json.dump(late_data, f)
+
+        # 3. Next call to get_thresholds must automatically load it
+        err_loaded, p95_loaded = ks_late.get_thresholds()
+        self.assertIsNotNone(ks_late.baseline_bands)
+        self.assertEqual(err_loaded, 0.07)
+        self.assertEqual(p95_loaded, 300.0)
+
+    def test_container_scoping_rejects_substring_matches(self):
+        """
+        Regression test: Verify that containers require strict verified sandbox ownership:
+        - Mismatched compose project labels are rejected immediately.
+        - Missing or unapproved service labels under matching project are rejected.
+        - Unlabeled containers are never approved by loose names or prefixes.
+        - Explicit container ID allowlists are verified for legacy unlabeled containers.
+        """
+        from kill_switch import is_approved_sandbox_container
+
+        allowed = set(self.ks.allowed_services)
+
+        # 1. Missing service labels under matching project
+        missing_service = [
+            ("robot-shop-cart-1", {"com.docker.compose.project": "robot-shop"}),
+            ("robot-shop-web", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": ""}),
+        ]
+        for name, labels in missing_service:
+            self.assertFalse(
+                is_approved_sandbox_container(name, labels, "robot-shop", allowed),
+                f"Container {name} with missing/empty service label must be rejected",
+            )
+
+        # 2. Wrong project labels (even with valid service name)
+        wrong_project = [
+            ("robot-shop-cart-1", {"com.docker.compose.project": "different-project", "com.docker.compose.service": "cart"}),
+            ("cart", {"com.docker.compose.project": "foreign-project", "com.docker.compose.service": "cart"}),
+            ("web", {"com.docker.compose.project": "other-app", "com.docker.compose.service": "web"}),
+        ]
+        for name, labels in wrong_project:
+            self.assertFalse(
+                is_approved_sandbox_container(name, labels, "robot-shop", allowed),
+                f"Container {name} with wrong project label must be rejected",
+            )
+
+        # 3. Matching project but unapproved service label
+        unapproved_service = [
+            ("robot-shop-tool", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "unapproved-debugger"}),
+            ("robot-shop-admin", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "root-shell"}),
+        ]
+        for name, labels in unapproved_service:
+            self.assertFalse(
+                is_approved_sandbox_container(name, labels, "robot-shop", allowed),
+                f"Container {name} with unapproved service label must be rejected",
+            )
+
+        # 4. Misleading names / prefixes on unlabeled containers
+        unlabeled_misleading = [
+            ("personal-web", {}),
+            ("mysql-production-db", {}),
+            ("user-authentication-service", {}),
+            ("analytics-redis-cache", {}),
+            ("unrelated-ratings-api", {}),
+            ("personal-cart", {}),
+            ("robot-shop-cart-1", {}),
+            ("robot-shop_ratings_1", {}),
+            ("robot-shop-web", {}),
+            ("cart", {}),
+            ("mysql", {}),
+            ("redis", {}),
+        ]
+        for name, labels in unlabeled_misleading:
+            self.assertFalse(
+                is_approved_sandbox_container(name, labels, "robot-shop", allowed),
+                f"Unlabeled container {name} must NOT be recognized solely by name/prefix",
+            )
+
+        # 5. Legitimate Compose-managed sandbox containers
+        approved = [
+            ("robot-shop-cart-1", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "cart"}),
+            ("robot-shop_ratings_1", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "ratings"}),
+            ("robot-shop-web", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "web"}),
+            ("custom-named", {"com.docker.compose.project": "robot-shop", "com.docker.compose.service": "cart"}),
+        ]
+        for name, labels in approved:
+            self.assertTrue(
+                is_approved_sandbox_container(name, labels, "robot-shop", allowed),
+                f"Valid sandbox container {name} SHOULD be recognized as approved",
+            )
+
+        # 6. Legacy unlabeled container with explicit ID allowlist
+        allowed_ids = {"c123456789012345"}
+        self.assertTrue(
+            is_approved_sandbox_container(
+                "legacy-cart",
+                {},
+                "robot-shop",
+                allowed,
+                container_id="c123456789012345",
+                allowed_container_ids=allowed_ids,
+            ),
+            "Unlabeled container with matching container_id in allowlist should be approved",
+        )
+        self.assertTrue(
+            is_approved_sandbox_container(
+                "legacy-cart",
+                {},
+                "robot-shop",
+                allowed,
+                container_id="c123456789012345",
+                allowed_container_ids={"c12345678901"},  # 12-char prefix match
+            ),
+            "Unlabeled container with matching 12-char container_id in allowlist should be approved",
+        )
+        self.assertFalse(
+            is_approved_sandbox_container(
+                "legacy-cart",
+                {},
+                "robot-shop",
+                allowed,
+                container_id="unapproved-id-999",
+                allowed_container_ids=allowed_ids,
+            ),
+            "Unlabeled container with unapproved container_id must be rejected",
+        )
 
 
 if __name__ == "__main__":

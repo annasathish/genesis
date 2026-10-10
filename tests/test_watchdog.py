@@ -66,27 +66,85 @@ class TestDeadManWatchdog(unittest.TestCase):
         self.assertIn("error", data)
 
     def test_container_revival_strictly_limited_to_sandbox(self):
-        # 3 containers:
-        # c1: stopped robot-shop container
-        # c2: running robot-shop container
+        # c1: stopped verified robot-shop container
+        # c2: running verified robot-shop container
         # c3: stopped unrelated container (e.g. system-metrics) -> MUST NOT BE STARTED
+        # c4, c5: stopped host containers with service substrings -> MUST NOT BE STARTED
+        # c6: container with matching prefix but MISMATCHED compose project label -> MUST NOT BE STARTED
+        # c7: matching compose project but MISSING service label -> MUST NOT BE STARTED
+        # c8: unlabeled container with misleading prefix -> MUST NOT BE STARTED
+        # c9: matching compose project but UNAPPROVED service -> MUST NOT BE STARTED
         mock_c1 = MagicMock()
         mock_c1.name = "robot-shop-shipping-1"
         mock_c1.status = "exited"
-        mock_c1.labels = {"com.docker.compose.project": "robot-shop"}
+        mock_c1.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "shipping",
+        }
 
         mock_c2 = MagicMock()
         mock_c2.name = "robot-shop-web-1"
         mock_c2.status = "running"
-        mock_c2.labels = {"com.docker.compose.project": "robot-shop"}
+        mock_c2.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "web",
+        }
 
         mock_c3 = MagicMock()
         mock_c3.name = "system-monitoring-prometheus"
         mock_c3.status = "exited"
         mock_c3.labels = {"com.docker.compose.project": "system-infra"}
 
+        # Containers containing service substrings but NOT belonging to sandbox:
+        mock_c4 = MagicMock()
+        mock_c4.name = "personal-mysql"
+        mock_c4.status = "exited"
+        mock_c4.labels = {}
+
+        mock_c5 = MagicMock()
+        mock_c5.name = "corp-user-api"
+        mock_c5.status = "exited"
+        mock_c5.labels = {}
+
+        # Container with matching prefix but MISMATCHED compose project label:
+        mock_c6 = MagicMock()
+        mock_c6.name = "robot-shop-cart-1"
+        mock_c6.status = "exited"
+        mock_c6.labels = {"com.docker.compose.project": "foreign-project", "com.docker.compose.service": "cart"}
+
+        # Container with matching compose project but MISSING service label:
+        mock_c7 = MagicMock()
+        mock_c7.name = "robot-shop-unlabeled-svc"
+        mock_c7.status = "exited"
+        mock_c7.labels = {"com.docker.compose.project": "robot-shop"}
+
+        # Unlabeled container with misleading prefix:
+        mock_c8 = MagicMock()
+        mock_c8.name = "robot-shop-cart-misleading"
+        mock_c8.status = "exited"
+        mock_c8.labels = {}
+
+        # Container with matching project but UNAPPROVED service:
+        mock_c9 = MagicMock()
+        mock_c9.name = "robot-shop-debugger"
+        mock_c9.status = "exited"
+        mock_c9.labels = {
+            "com.docker.compose.project": "robot-shop",
+            "com.docker.compose.service": "unapproved-debugger",
+        }
+
         mock_client = MagicMock()
-        mock_client.containers.list.return_value = [mock_c1, mock_c2, mock_c3]
+        mock_client.containers.list.return_value = [
+            mock_c1,
+            mock_c2,
+            mock_c3,
+            mock_c4,
+            mock_c5,
+            mock_c6,
+            mock_c7,
+            mock_c8,
+            mock_c9,
+        ]
 
         with patch.object(self.watchdog, "_get_docker_client", return_value=mock_client):
             restarted = self.watchdog._revive_sandbox_containers()
@@ -95,6 +153,12 @@ class TestDeadManWatchdog(unittest.TestCase):
             self.assertTrue(mock_c1.start.called)
             self.assertFalse(mock_c2.start.called)
             self.assertFalse(mock_c3.start.called)
+            self.assertFalse(mock_c4.start.called)
+            self.assertFalse(mock_c5.start.called)
+            self.assertFalse(mock_c6.start.called)
+            self.assertFalse(mock_c7.start.called)
+            self.assertFalse(mock_c8.start.called)
+            self.assertFalse(mock_c9.start.called)
 
     def test_purge_toxiproxy_toxics(self):
         mock_client = MagicMock()
