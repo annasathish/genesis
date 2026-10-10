@@ -8,8 +8,9 @@ class ExperimentIntent(Base):
     __tablename__ = 'experiment_intent'
     
     id = Column(Integer, primary_key=True, index=True)
-    fault_type = Column(String, nullable=False)      # e.g., 'container_crash'
+    fault_type = Column(String, nullable=False)      # e.g., 'container_crash', 'network_latency'
     target_service = Column(String, nullable=False)  # e.g., 'cart'
+    fault_params = Column(String, nullable=True)     # JSON string, e.g., '{"latency_ms": 200}'
     rollback_command = Column(String, nullable=False)
     status = Column(String, default="pending")       # pending, running, success, aborted
     created_at = Column(DateTime, default=datetime.utcnow)

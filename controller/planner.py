@@ -90,3 +90,52 @@ def llm_rerank(candidates: List[Dict]) -> List[Dict]:
     except Exception as e:
         print(f"LLM re-ranking failed, falling back to heuristics. Error: {e}")
         return candidates
+
+def generate_adaptive_candidate(last_intent: dict, last_result: dict, graph: dict) -> dict:
+    """
+    Implements the Adaptive Loop (Magnitude Ramping).
+    Takes the result of the last experiment. If the hypothesis failed (e.g., system didn't break),
+    it ramps up the magnitude or probes adjacent services.
+    """
+    fault_type = last_intent.get("fault_type")
+    target = last_intent.get("target_service")
+    params = json.loads(last_intent.get("fault_params", "{}"))
+    kill_switch_fired = last_result.get("kill_switch_fired", False)
+    
+    # Scenario 1: We tried a network latency attack, and the system survived perfectly.
+    # Adaptive Action: Ramp up the magnitude (e.g., 200ms -> 800ms)
+    if not kill_switch_fired and fault_type == "network_latency":
+        current_latency = params.get("latency_ms", 200)
+        new_latency = current_latency * 4  # Aggressive ramp up
+        
+        # Clamp to a maximum reasonable value to prevent infinite ramping
+        new_latency = min(new_latency, 3000)
+        
+        return {
+            "candidate_id": last_intent.get("id", 0) + 1000,
+            "target_service": target,
+            "fault_type": fault_type,
+            "fault_params": json.dumps({"latency_ms": new_latency}),
+            "reasoning": f"Adaptive Loop: Target {target} survived {current_latency}ms latency. Ramping magnitude to {new_latency}ms to find the breaking point."
+        }
+        
+    # Scenario 2: The system broke (Kill switch fired).
+    # Adaptive Action: The hypothesis was correct. Now probe an adjacent service in the graph.
+    if kill_switch_fired:
+        edges = graph.get("edges", [])
+        # Find a service that depends on the target or that the target depends on
+        adjacent_services = [e["target"] for e in edges if e["source"] == target]
+        if not adjacent_services:
+            adjacent_services = [e["source"] for e in edges if e["target"] == target]
+            
+        next_target = adjacent_services[0] if adjacent_services else "frontend"
+        
+        return {
+            "candidate_id": last_intent.get("id", 0) + 1000,
+            "target_service": next_target,
+            "fault_type": "container_crash", # Pivot to a different fault type
+            "fault_params": "{}",
+            "reasoning": f"Adaptive Loop: Target {target} successfully failed. Shifting blast radius investigation to adjacent node: {next_target}."
+        }
+        
+    return None

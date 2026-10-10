@@ -45,6 +45,31 @@ def generate_candidates():
     
     return {"status": "success", "candidates": final_plan}
 
+@app.post("/api/v1/plan/adaptive")
+def generate_adaptive_plan(last_intent_id: int):
+    """Generates an adaptive candidate based on the previous experiment's result"""
+    db = SessionLocal()
+    try:
+        from models import ExperimentIntent, ExperimentResult
+        intent = db.query(ExperimentIntent).filter(ExperimentIntent.id == last_intent_id).first()
+        result = db.query(ExperimentResult).filter(ExperimentResult.intent_id == last_intent_id).first()
+        
+        if not intent or not result:
+            return {"error": "Previous intent or result not found"}
+            
+        with open("graph.json", "r") as f:
+            graph = json.load(f)
+            
+        import planner
+        adaptive_candidate = planner.generate_adaptive_candidate(
+            intent.__dict__, 
+            result.__dict__, 
+            graph
+        )
+        return {"status": "success", "candidate": adaptive_candidate}
+    finally:
+        db.close()
+
 @app.post("/api/v1/inject")
 def inject_fault():
     """Triggered by CLI to start a chaos experiment"""
