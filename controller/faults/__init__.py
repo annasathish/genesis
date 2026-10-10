@@ -1,3 +1,4 @@
+from .base import BaseFault
 from .docker_client import (
     APIError,
     AsyncDockerClient,
@@ -5,4 +6,10 @@ from .docker_client import (
     NotFound,
 )
 
-__all__ = ["AsyncDockerClient", "DockerException", "NotFound", "APIError"]
+__all__ = [
+    "AsyncDockerClient",
+    "BaseFault",
+    "DockerException",
+    "NotFound",
+    "APIError",
+]
