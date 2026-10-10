@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-10-10T11:22:59.605825+00:00",
+  "total_experiments": 1,
+  "overall_score": 1.7,
+  "kill_switch_count": 1,
+  "kill_switch_services": [
+    "cart"
+  ],
+  "weakest_service": "cart",
+  "experiments": [
+    {
+      "intent_id": 1,
+      "fault_type": "container_crash",
+      "target_service": "cart",
+      "fault_params": "{}",
+      "status": "success",
+      "p95_baseline": 120.0,
+      "p95_during": 850.0,
+      "error_rate_pct": 25.0,
+      "recovery_time": 45.0,
+      "kill_switch_fired": true,
+      "latency_score": 0.0,
+      "error_score": 0.0,
+      "recovery_score": 0.85,
+      "composite_score": 0.17,
+      "score_out_of_10": 1.7,
+      "platform_safety": {
+        "kill_switch_triggered": true,
+        "note": "Kill switch activation is logged as a Platform Safety metric and does not affect the app resilience score."
+      },
+      "llm_analysis": "The container_crash fault on 'cart' caused severe degradation, triggering the Kill Switch. The service lacks sufficient redundancy to absorb this class of failure.",
+      "recommended_fix": "Implement Circuit Breaker"
+    }
+  ],
+  "weaknesses": [
+    {
+      "service": "cart",
+      "fault_type": "container_crash",
+      "score": 1.7,
+      "criticality": "Critical"
+    }
+  ]
+}
