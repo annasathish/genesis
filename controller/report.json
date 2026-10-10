@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-10T11:22:59.605825+00:00",
+  "generated_at": "2026-10-10T17:33:14.939354+00:00",
   "total_experiments": 1,
   "overall_score": 1.7,
   "kill_switch_count": 1,
@@ -29,6 +29,7 @@
         "note": "Kill switch activation is logged as a Platform Safety metric and does not affect the app resilience score."
       },
       "llm_analysis": "The container_crash fault on 'cart' caused severe degradation, triggering the Kill Switch. The service lacks sufficient redundancy to absorb this class of failure.",
+      "analysis": "The container_crash fault on 'cart' caused severe degradation, triggering the Kill Switch. The service lacks sufficient redundancy to absorb this class of failure.",
       "recommended_fix": "Implement Circuit Breaker"
     }
   ],
@@ -37,7 +38,9 @@
       "service": "cart",
       "fault_type": "container_crash",
       "score": 1.7,
-      "criticality": "Critical"
+      "criticality": "Critical",
+      "recommended_fix": "Implement Circuit Breaker",
+      "analysis": "The container_crash fault on 'cart' caused severe degradation, triggering the Kill Switch. The service lacks sufficient redundancy to absorb this class of failure."
     }
   ]
 }

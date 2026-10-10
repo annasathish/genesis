@@ -178,6 +178,7 @@ def generate_report(
                 "kill_switch_fired": result.kill_switch_fired,
                 **score,
                 "llm_analysis": analysis.get("explanation"),
+                "analysis": analysis.get("explanation"),
                 "recommended_fix": analysis.get("recommended_fix"),
             }
             experiments.append(exp_data)
@@ -187,6 +188,8 @@ def generate_report(
                 "fault_type": intent.fault_type,
                 "score": score["score_out_of_10"],
                 "criticality": _classify_criticality(score["score_out_of_10"]),
+                "recommended_fix": analysis.get("recommended_fix"),
+                "analysis": analysis.get("explanation"),
             })
 
         # Sort weaknesses by score ascending (worst first)

@@ -1,6 +1,6 @@
 # 🧪 AI-Driven Chaos Engineering — Resilience Report
 
-> Generated: 2026-10-10T11:22:59.605825+00:00
+> Generated: 2026-10-10T17:33:14.939354+00:00
 
 ---
 
@@ -48,10 +48,10 @@
 
 ## Ranked Weaknesses (by Severity)
 
-| Rank | Service | Fault Type | Score | Criticality |
-|------|---------|------------|-------|-------------|
+| Rank | Service | Fault Type | Score | Criticality | Recommended Fix |
+|------|---------|------------|-------|-------------|-----------------|
 
-| 1 | cart | container_crash | 1.7/10 | Critical |
+| 1 | cart | container_crash | 1.7/10 | Critical | `Implement Circuit Breaker` |
 
 
 ---

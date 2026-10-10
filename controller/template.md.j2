@@ -48,10 +48,10 @@
 
 ## Ranked Weaknesses (by Severity)
 
-| Rank | Service | Fault Type | Score | Criticality |
-|------|---------|------------|-------|-------------|
+| Rank | Service | Fault Type | Score | Criticality | Recommended Fix |
+|------|---------|------------|-------|-------------|-----------------|
 {% for w in weaknesses %}
-| {{ loop.index }} | {{ w.service }} | {{ w.fault_type }} | {{ w.score }}/10 | {{ w.criticality }} |
+| {{ loop.index }} | {{ w.service }} | {{ w.fault_type }} | {{ w.score }}/10 | {{ w.criticality }} | `{{ w.recommended_fix }}` |
 {% endfor %}
 
 ---
