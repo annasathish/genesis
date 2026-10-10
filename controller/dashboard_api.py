@@ -136,26 +136,41 @@ def get_insights(db: Session = Depends(get_db)):
     # Try LLM if enabled
     if os.environ.get("USE_LLM", "false").lower() == "true":
         try:
+            latest = db.query(MetricsSnapshot).order_by(MetricsSnapshot.timestamp.desc()).first()
+            current_latency = latest.p95_latency_ms if latest else 0
+            current_errors = latest.error_rate_pct if latest else 0
+
+            import google.generativeai as genai
             genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "DUMMY_KEY"))
             model = genai.GenerativeModel("gemini-2.5-flash")
             
             prompt = f"""
-            You are a Business Metrics Architect and Site Reliability Engineer. 
-            A chaos experiment is currently targeting the e-commerce microservice '{target}' with fault '{fault_type}'.
-            Estimate the business and financial impact of this failure. 
-            Return strictly a JSON object with these keys:
-            - churn_risk (string: HIGH, MEDIUM, LOW)
-            - funnel_impact (string: 1-2 sentences describing user experience impact)
-            - dau_impact (string: e.g. "15% Bounce Rate Spike")
-            - revenue_at_risk (string: e.g. "$45,000")
-            - sla_depletion (string: e.g. "4.2%")
-            - support_volume (string: 1 sentence predicted support ticket surge)
-            - roi_recommendation (string: 1 sentence architectural fix to save money)
-            Do not include markdown or backticks.
+            You are a Principal Site Reliability Engineer and Business Metrics Architect at a Fortune 500 company.
+            A chaos experiment is currently targeting the microservice '{target}' with fault '{fault_type}'.
+
+            LIVE TELEMETRY DATA:
+            - Current P95 Latency: {current_latency}ms
+            - Current Error Rate: {current_errors}%
+
+            Based on this real-time data, calculate the severe business and financial impact of this failure. 
+            Be highly specific and realistic. If latency is high, emphasize user frustration. If errors are high, emphasize lost sales.
+
+            Return strictly a JSON object with these exact keys:
+            - "churn_risk": (string: HIGH, MEDIUM, LOW)
+            - "funnel_impact": (string: 1 sentence detailing exactly which user flow is broken, e.g., "Checkout button unresponsive")
+            - "dau_impact": (string: e.g. "Predicted 22% drop in DAU due to timeout errors")
+            - "revenue_at_risk": (string: Calculate dollar impact assuming $100/min baseline. e.g. "$4,500/hr")
+            - "sla_depletion": (string: e.g. "9.4%")
+            - "support_volume": (string: 1 sentence predicted support ticket surge)
+            - "roi_recommendation": (string: Recommend a specific architectural pattern like Circuit Breaker, Bulkhead, or Redis Fallback Cache)
             """
-            response = model.generate_content(prompt)
-            raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-            insight_data = json.loads(raw_text)
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            insight_data = json.loads(response.text)
             
             LLM_INSIGHT_CACHE[intent_id] = insight_data
             return insight_data

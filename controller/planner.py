@@ -59,21 +59,28 @@ def llm_rerank(candidates: List[Dict]) -> List[Dict]:
     top_candidates = candidates[:10]
     
     prompt = f"""
-    You are an expert Chaos Engineer. Re-rank the following failure injection candidates based on their potential to reveal critical architectural weaknesses. 
+    You are an expert Chaos Engineer. Re-rank the following failure injection candidates based on their potential to reveal critical architectural weaknesses (Single Points of Failure). 
+
     Return your response strictly as a JSON array of objects with keys: 'candidate_id', 'rank', 'reason', 'hypothesis'.
-    Do not include markdown blocks or any other text.
     
-    Candidates:
+    EXAMPLE GOOD HYPOTHESIS:
+    "If the RabbitMQ queue goes down, the payment gateway will timeout, causing the upstream web UI to freeze rather than gracefully degrading."
+    
+    Candidates to re-rank:
     {json.dumps(top_candidates, indent=2)}
     """
     
     try:
         model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json"
+            )
+        )
         # Parse the JSON response
-        # In a robust implementation, we would strip markdown ```json blocks here
-        raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        reranked = json.loads(raw_text)
+        reranked = json.loads(response.text)
+
         
         # Merge LLM ranking back with candidate details
         final_list = []
