@@ -12,7 +12,9 @@ What it proves, with numbers:
   4. detection     : kill-switch rule = error rate > max(5 %, 3x baseline) for 2 consecutive 5 s windows
   5. fix           : POST /api/v1/rollback/<intent> (docker start) + restart `web` so nginx re-resolves the IP
   6. recovery      : error rate < 2 % for 2 consecutive windows; prints time-to-detect and time-to-recover
-A JSON record of the run is written to runs/day1_<timestamp>.json for the findings report.
+A JSON record of the run is written to runs/day1_<timestamp>.json for the findings report and the
+insights dashboard (`make dashboard`). Label runs with the change made before them, so run-to-run
+improvement can be attributed:  python scripts/day1_demo.py --label "cart: cache catalogue products"
 """
 import argparse
 import json
@@ -56,6 +58,12 @@ def window(prev, cur):
     return req, fail, (fail / req if req else 0.0), failing
 
 
+def endpoint_deltas(prev, cur):
+    """{endpoint: [requests, failures]} for this window (feeds the business-impact checkout measurement)."""
+    return {n: [r - prev.get(n, (0, 0))[0], f - prev.get(n, (0, 0))[1]]
+            for n, (r, f) in cur.items() if n != "Aggregated"}
+
+
 def docker_down():
     """Target containers that are not running or not healthy."""
     out = subprocess.run(
@@ -74,9 +82,11 @@ def main():
     ap.add_argument("--ttl", type=int, default=180, help="backstop auto-rollback (s)")
     ap.add_argument("--baseline", type=int, default=30, help="steady-state seconds")
     ap.add_argument("--max-wait", type=int, default=120, help="give up detecting/recovering after (s)")
+    ap.add_argument("--label", default="", help="what changed before this run, e.g. 'added retries to cart'")
     a = ap.parse_args()
 
-    run = {"target": a.target, "fault": a.fault, "windows": []}
+    run = {"target": a.target, "fault": a.fault, "label": a.label, "window_s": WINDOW,
+           "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "windows": []}
 
     # 0. preflight
     code, root = http("GET", f"{API}/")
@@ -88,6 +98,7 @@ def main():
     # 1. baseline
     print(f"[1] baseline: {a.baseline}s of steady load")
     prev, _ = locust_rows()
+    b_start = prev
     t0 = time.time()
     b_req = b_fail = 0
     while time.time() - t0 < a.baseline:
@@ -98,7 +109,8 @@ def main():
         print(f"    {time.time()-t0:5.0f}s  req={req:4d}  err={rate:6.2%}  p95={p95}ms")
     base_rate = b_fail / b_req if b_req else 0.0
     threshold = max(0.05, 3 * base_rate)
-    run["baseline"] = {"requests": b_req, "error_rate": base_rate, "p95_ms": p95, "threshold": threshold}
+    run["baseline"] = {"requests": b_req, "error_rate": base_rate, "p95_ms": p95, "threshold": threshold,
+                       "duration_s": round(time.time() - t0, 1), "ep": endpoint_deltas(b_start, prev)}
     print(f"    baseline error rate {base_rate:.2%}, p95 {p95} ms -> kill-switch threshold {threshold:.0%}")
 
     # 2. inject
@@ -118,12 +130,13 @@ def main():
         time.sleep(WINDOW)
         cur, p95 = locust_rows()
         req, fail, rate, failing = window(prev, cur)
+        ep = endpoint_deltas(prev, cur)
         prev = cur
         down = docker_down()
         affected.update(failing)
         down_seen.update(down)
         run["windows"].append({"t": round(time.time() - t_inject, 1), "phase": "fault", "req": req,
-                               "err": rate, "p95": p95, "failing": failing, "down": down})
+                               "err": rate, "p95": p95, "failing": failing, "down": down, "ep": ep})
         print(f"    +{time.time()-t_inject:5.0f}s  err={rate:6.2%}  p95={p95}ms  down={down}  failing={failing}")
         breaches = breaches + 1 if rate > threshold else 0
         if breaches >= 2:
@@ -147,10 +160,11 @@ def main():
         time.sleep(WINDOW)
         cur, p95 = locust_rows()
         req, fail, rate, failing = window(prev, cur)
+        ep = endpoint_deltas(prev, cur)
         prev = cur
         down = docker_down()
         run["windows"].append({"t": round(time.time() - t_inject, 1), "phase": "recovery", "req": req,
-                               "err": rate, "p95": p95, "failing": failing, "down": down})
+                               "err": rate, "p95": p95, "failing": failing, "down": down, "ep": ep})
         print(f"    +{time.time()-t_inject:5.0f}s  err={rate:6.2%}  p95={p95}ms  down={down}")
         ok = ok + 1 if (rate < 0.02 and not down and req > 0) else 0
         if ok >= 2:

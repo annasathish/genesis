@@ -13,7 +13,12 @@ import json
 import os
 from typing import Optional
 
-import google.generativeai as genai
+try:  # Gemini REST client + PII masking shared with the dashboard (controller/insights/)
+    from insights import llm
+    from insights.pii import Masker
+except ImportError:  # pragma: no cover - keep the analyzer usable on its own (heuristics only)
+    llm = None
+    Masker = None
 
 # ── Fixed Vocabulary ────────────────────────────────────────────────
 FIXED_VOCABULARY = [
@@ -23,14 +28,10 @@ FIXED_VOCABULARY = [
     "Implement Circuit Breaker",
 ]
 
-MODEL_NAME = "gemini-2.5-flash"
-
-
-def _configure_genai() -> None:
-    """Configure the Gemini SDK (idempotent)."""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if api_key:
-        genai.configure(api_key=api_key)
+# Model: CHAT_MODEL or gemini-flash-latest, with automatic fallback to the newest available Flash model.
+# Calls go through insights/llm.py (stdlib REST). The pinned google-generativeai==0.2.1 SDK has no
+# GenerativeModel class, so the old SDK path always failed and silently fell back to heuristics.
+MODEL_NAME = os.environ.get("CHAT_MODEL", "gemini-flash-latest")
 
 
 def analyze_experiment(
@@ -87,8 +88,9 @@ def _llm_analysis(
     kill_switch_fired: bool,
     score_out_of_10: float,
 ) -> dict:
-    """Call Gemini with strict constraints."""
-    _configure_genai()
+    """Call Gemini with strict constraints. Any failure raises, and analyze_experiment falls back to heuristics."""
+    if llm is None:
+        raise RuntimeError("insights.llm unavailable")
 
     prompt = f"""You are an expert Site-Reliability Engineer reviewing a chaos experiment.
 
@@ -109,10 +111,14 @@ Respond in this exact JSON format (no markdown, no extra text):
 {{"explanation": "...", "recommended_fix": "..."}}
 """
 
-    model = genai.GenerativeModel(MODEL_NAME)
-    response = model.generate_content(prompt)
-    raw = response.text.strip().removeprefix("```json").removesuffix("```").strip()
+    if Masker is not None:
+        prompt = Masker().mask_text(prompt)
+
+    out = llm.generate("", [{"role": "user", "parts": [{"text": prompt}]}], max_tokens=600)
+    raw = out["text"].strip().removeprefix("```json").removesuffix("```").strip()
     parsed = json.loads(raw)
+    if Masker is not None:
+        parsed["explanation"] = Masker().mask_text(parsed.get("explanation", ""))
 
     # Enforce vocabulary constraint
     fix = parsed.get("recommended_fix", "")

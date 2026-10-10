@@ -15,9 +15,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-# Include Dashboard APIs
-from dashboard_api import router as dashboard_router
-app.include_router(dashboard_router)
+# The team dashboard is controller/insights/dashboard (make dashboard -> :8050). The earlier dashboard_api.py
+# router is not mounted: it filled missing data with random values. Old links to /dashboard land on the new one.
+from fastapi.responses import RedirectResponse
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard_redirect():
+    return RedirectResponse("http://127.0.0.1:8050/")
 
 @app.get("/")
 def read_root():

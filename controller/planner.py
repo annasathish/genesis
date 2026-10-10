@@ -1,12 +1,17 @@
 import json
 import os
-import google.generativeai as genai
 from typing import List, Dict
 
-# Set up Gemini
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "DUMMY_KEY"))
-# Using the correct model per the user's architectural review
-MODEL_NAME = "gemini-2.5-flash"
+try:  # Gemini REST client + PII masking shared with the dashboard (controller/insights/)
+    from insights import llm
+    from insights.pii import Masker
+except ImportError:  # pragma: no cover - heuristics still work without it
+    llm = None
+    Masker = None
+
+# Model: CHAT_MODEL or gemini-flash-latest, with automatic fallback to the newest available Flash model.
+# (The pinned google-generativeai==0.2.1 SDK has no GenerativeModel class, so the old path always failed.)
+MODEL_NAME = os.environ.get("CHAT_MODEL", "gemini-flash-latest")
 
 AVAILABLE_FAULTS = ["container_crash", "network_latency", "disk_fill"]
 
@@ -68,11 +73,12 @@ def llm_rerank(candidates: List[Dict]) -> List[Dict]:
     """
     
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(prompt)
-        # Parse the JSON response
-        # In a robust implementation, we would strip markdown ```json blocks here
-        raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
+        if llm is None:
+            raise RuntimeError("insights.llm unavailable")
+        if Masker is not None:
+            prompt = Masker().mask_text(prompt)
+        out = llm.generate("", [{"role": "user", "parts": [{"text": prompt}]}], max_tokens=2000)
+        raw_text = out["text"].strip().removeprefix("```json").removesuffix("```").strip()
         reranked = json.loads(raw_text)
         
         # Merge LLM ranking back with candidate details

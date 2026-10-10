@@ -1,0 +1,13 @@
+{
+  "_comment": "Business assumptions for the impact model. Edit these to match the real business; the dashboard can override them per session. Sandbox traffic is tiny, so impact is projected onto production traffic below.",
+  "currency": "USD",
+  "avg_order_value": 45.0,
+  "orders_per_minute": 120,
+  "customer_retry_rate": 0.40,
+  "incident_cost_per_minute": 25.0,
+  "incidents_per_year": 6,
+  "support_ticket_rate": 0.15,
+  "cost_per_ticket": 6.0,
+  "slo_target": 0.999,
+  "slo_window_days": 30
+}

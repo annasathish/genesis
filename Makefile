@@ -11,7 +11,7 @@ API    ?= http://127.0.0.1:8000
 
 .PHONY: help pull up down nuke sandbox-up controller-up ps logs stats verify test-caps test-fill \
         toxics-clear db-export backup-fetch backup-build backup-up backup-down map baseline inject stop report \
-        test watchdog-up controller-dev watchdog-dev demo
+        test watchdog-up controller-dev watchdog-dev demo insights dashboard
 
 help:
 	@echo "M1 platform targets:"
@@ -25,6 +25,7 @@ help:
 	@echo "  make toxics-clear  remove every Toxiproxy toxic (manual panic for network faults)"
 	@echo "  make backup-fetch | backup-build | backup-up | backup-down   Martian Bank hot standby"
 	@echo "Team targets: make map (M2) | baseline [dur=600] (M4) | watchdog-up (M4) | inject (M3) | stop (M3/M4) | report (M5) | test | demo"
+	@echo "Insights:     make insights (run-to-run improvement + business impact) | make dashboard (http://127.0.0.1:8050 + Copilot chat)"
 
 # ------------------------------------------------------------------ sandbox
 pull:
@@ -119,3 +120,10 @@ demo:
 
 db-export:      ## copy the controller SQLite out of its volume to controller/chaos_state.export.db
 	$(CTL) cp api:/data/chaos_state.db controller/chaos_state.export.db
+
+# ------------------------------------------------------------------ insights (read-only over runs/*.json, host side)
+insights:       ## run-to-run improvement, significance, business impact in the terminal
+	cd controller && $(PYTHON) -m insights
+
+dashboard:      ## interactive dashboard + Resilience Copilot chat on http://127.0.0.1:8050 (GEMINI_API_KEY optional)
+	cd controller && $(PYTHON) -m insights.dashboard.server

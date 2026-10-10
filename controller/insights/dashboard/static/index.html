@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resilience Dashboard</title>
+<link rel="stylesheet" href="/static/styles.css?v=3">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Genesis <span class="muted">Resilience</span></h1>
+    <span class="status" id="status" data-level="unknown"><span class="dot"></span><span id="status-text">connecting…</span></span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="live" class="active">Live</button>
+    <button role="tab" data-tab="experiments">Experiments</button>
+    <button role="tab" data-tab="business">Business impact</button>
+  </nav>
+  <div class="hdr-right">
+    <span class="sources" id="sources" title="Live data sources"></span>
+    <button id="theme" title="Toggle light/dark">Theme</button>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <!-- ============================== LIVE ============================== -->
+    <section class="tab-panel" data-panel="live">
+      <div class="tiles" id="live-tiles"></div>
+
+      <div class="grid-live">
+        <div class="card">
+          <div class="card-head"><h2>System map</h2><span class="hint">click a service · colour = live health</span></div>
+          <div id="topo" class="topo"></div>
+          <div id="node-detail" class="node-detail"><span class="hint">Select a service to see its live state, vulnerability and blast radius.</span></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Vulnerability board</h2><span class="hint" id="coverage"></span></div>
+          <ol class="vboard" id="vboard"></ol>
+          <details><summary>How H<sub>v</sub> is scored</summary><p class="method-p" id="hv-formula"></p></details>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Live telemetry</h2><span class="hint">Locust load generator · one point per 3 s window · last ~5 min</span></div>
+        <div class="grid3">
+          <div class="chart-box short"><canvas id="c-rps"></canvas></div>
+          <div class="chart-box short"><canvas id="c-err"></canvas></div>
+          <div class="chart-box short"><canvas id="c-p95"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== EXPERIMENTS ============================== -->
+    <section class="tab-panel" data-panel="experiments" hidden>
+      <div class="tiles" id="tiles"></div>
+      <div class="card">
+        <h2>Run-to-run improvement</h2>
+        <p class="hint">Like-for-like runs only (same fault, target, parameters). A step counts as an improvement only if it is statistically significant.</p>
+        <div class="row" style="margin-bottom:10px">
+          <label>Experiment <select id="group"></select></label>
+          <label>Metric <select id="trend-kpi">
+            <option value="error_minutes">Error-minutes (primary)</option>
+            <option value="peak_error_rate">Peak error rate</option>
+            <option value="fault_error_rate">Fault-phase error rate</option>
+            <option value="failed_requests">Failed requests</option>
+            <option value="checkout_loss_min">Checkout-loss minutes</option>
+            <option value="resilience_score">Resilience score (/10)</option>
+          </select></label>
+        </div>
+        <div class="grid2">
+          <div class="chart-box short"><canvas id="trend"></canvas></div>
+          <div class="chart-box short"><canvas id="times"></canvas></div>
+        </div>
+        <div class="table-wrap" style="margin-top:14px"><table id="steps"></table></div>
+        <details><summary>How improvement is calculated</summary><ul class="method" id="method"></ul></details>
+      </div>
+      <div class="card">
+        <h2>Run timeline</h2>
+        <p class="hint">Error rate per 5 s window. Red band = fault active, green band = after rollback. Dashed line = kill-switch threshold.</p>
+        <div class="row" style="margin-bottom:10px">
+          <label>Run <select id="run-select"></select></label>
+          <span class="pill" id="run-facts"></span>
+        </div>
+        <div class="chart-box"><canvas id="timeline"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ============================== BUSINESS ============================== -->
+    <section class="tab-panel" data-panel="business" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Stakeholder brief</h2>
+          <div class="row"><select id="brief-run"></select><button id="brief-go" class="primary">Generate</button></div></div>
+        <div class="brief" id="brief"><span class="hint">Pick a run and generate a brief: what happened, what it affects, time and money, recommended fix.</span></div>
+        <div class="hint" id="brief-meta"></div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+
+      <div class="tiles" id="biz-tiles"></div>
+
+      <div class="card">
+        <h2>Cost per incident</h2>
+        <p class="hint">Measured outage, projected onto production traffic with the assumptions below. Change any value to re-price every run.</p>
+        <div class="assume" id="assume"></div>
+        <div class="chart-box short"><canvas id="cost"></canvas></div>
+        <div class="table-wrap" style="margin-top:12px"><table id="biz-table"></table></div>
+        <div class="note" id="biz-note"></div>
+        <details><summary>Formulas</summary><ul class="method" id="formulas"></ul></details>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================== COPILOT ============================== -->
+  <aside class="card chat">
+    <div class="chat-head">
+      <div class="row" style="justify-content:space-between"><h2>Resilience Copilot</h2><span class="pill" id="chat-model">…</span></div>
+      <p class="hint" style="margin:4px 0 0" id="chat-mode">Grounded in measured runs and live telemetry.</p>
+    </div>
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chips" id="chips"></div>
+    <form class="chat-input" id="chat-form">
+      <input id="chat-q" placeholder="Ask about the system, a run, cost, fixes…" autocomplete="off" maxlength="1000">
+      <button class="primary" type="submit">Send</button>
+    </form>
+  </aside>
+</main>
+<script src="/static/app.js?v=3"></script>
+</body>
+</html>
