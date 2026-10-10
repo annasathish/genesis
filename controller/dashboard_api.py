@@ -29,23 +29,27 @@ def get_metrics(db: Session = Depends(get_db)):
     latest = db.query(MetricsSnapshot).order_by(MetricsSnapshot.timestamp.desc()).first()
     active = db.query(ExperimentIntent).filter(ExperimentIntent.status == "running").first()
     
-    error_rate = latest.error_rate if latest else random.uniform(0.001, 0.02)
-    p95 = latest.p95_latency if latest else random.uniform(50.0, 150.0)
+    error_rate = latest.error_rate if latest else 0.0
+    p95 = latest.p95_latency if latest else 0.0
     
     kill_switch_open = (error_rate > 0.5) or (p95 > 2000.0)
     
-    status_msg = "🟢 SYSTEM STABLE"
-    if active:
+    if not latest:
+        status_msg = "⚪ WAITING FOR TELEMETRY"
+    elif active:
         status_msg = f"🔴 INJECTING FAILURE: {active.fault_type} on {active.target_service}"
     elif kill_switch_open:
         status_msg = "⚠️ SYSTEM RECOVERING"
+    else:
+        status_msg = "🟢 SYSTEM STABLE"
         
     return {
         "error_rate": round(error_rate * 100, 2), # %
         "p95_latency": round(p95, 2),
         "kill_switch_open": kill_switch_open,
         "status_badge": status_msg,
-        "timestamp": datetime.utcnow().strftime("%H:%M:%S")
+        "timestamp": datetime.utcnow().strftime("%H:%M:%S"),
+        "rmq_depth": getattr(latest, "rmq_depth", 0) if latest else 0
     }
 
 @router.get("/api/v1/rankings")
@@ -81,16 +85,18 @@ def get_rankings(db: Session = Depends(get_db)):
         cas = data["cascade"] / c
         
         if data["count"] == 0:
-            e = random.uniform(0, 15)
-            r = random.uniform(0, 10)
-            cas = random.uniform(0, 5)
-            if s in ["rabbitmq", "mongodb", "redis"]: e += 30 # Inherently riskier in heuristics
+            e, r, cas = 0.0, 0.0, 0.0
                 
         hv = (e * 0.4) + (r * 0.3) + (cas * 0.3)
         
-        status = "STABLE"
-        if hv > 50: status = "CRITICAL"
-        elif hv > 20: status = "FRAGILE"
+        if data["count"] == 0:
+            status = "WAITING"
+        elif hv > 50:
+            status = "CRITICAL"
+        elif hv > 20:
+            status = "FRAGILE"
+        else:
+            status = "STABLE"
         
         rankings.append({
             "service": s,

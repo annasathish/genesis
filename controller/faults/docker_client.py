@@ -35,20 +35,22 @@ class AsyncDockerClient:
         return self._client
 
     async def resolve_container(self, service_name: str) -> str:
-        """Resolve a Docker Compose service name (e.g. 'cart') using labels."""
+        """Resolve a Docker Compose service name (e.g. 'cart') using strict labels."""
         def _resolve() -> str:
             client = self._get_client()
             containers = client.containers.list(
                 all=True,
-                filters={"label": f"com.docker.compose.service={service_name}"},
+                filters={
+                    "label": [
+                        f"com.docker.compose.service={service_name}",
+                        "com.docker.compose.project=robotshop",
+                        "com.chaospilot.role=target"
+                    ]
+                },
             )
             if containers:
                 return containers[0].name
-            try:
-                c = client.containers.get(service_name)
-                return c.name
-            except NotFound:
-                raise NotFound(f"No container found for service: '{service_name}'")
+            raise NotFound(f"No container found for service: '{service_name}' in project 'robotshop' with target label")
 
         return await asyncio.to_thread(_resolve)
 

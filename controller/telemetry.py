@@ -439,6 +439,7 @@ class TelemetryCollector:
                 error_rate=float(snapshot.error_rate),
                 p95_latency=float(snapshot.p95_latency),
                 is_baseline=is_baseline,
+                rmq_depth=getattr(snapshot, 'rmq_depth', 0)
             )
             db_session.add(record)
             db_session.commit()

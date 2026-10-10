@@ -113,7 +113,7 @@ def generate_adaptive_candidate(last_intent: dict, last_result: dict, graph: dic
     # Adaptive Action: Ramp up the magnitude (e.g., 200ms -> 800ms)
     if not kill_switch_fired and fault_type == "network_latency":
         current_latency = params.get("latency_ms", 200)
-        new_latency = current_latency * 4  # Aggressive ramp up
+        new_latency = current_latency + 50  # Gentle ramp up
         
         # Clamp to a maximum reasonable value to prevent infinite ramping
         new_latency = min(new_latency, 3000)

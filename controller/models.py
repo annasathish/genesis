@@ -24,6 +24,7 @@ class MetricsSnapshot(Base):
     error_rate = Column(Float, nullable=False)
     p95_latency = Column(Float, nullable=False)
     is_baseline = Column(Boolean, default=False)
+    rmq_depth = Column(Integer, nullable=True)
 
 class ExperimentResult(Base):
     __tablename__ = 'experiment_result'

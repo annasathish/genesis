@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -5,12 +7,48 @@ import json
 from models import Base
 import mapper
 
-app = FastAPI(title="AI Chaos Engine Controller")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from heartbeat import HeartbeatEmitter
+    from kill_switch import KillSwitch
+    
+    hb = HeartbeatEmitter()
+    hb.start_background()
+    
+    ks = KillSwitch(session_factory=SessionLocal)
+    ks.start_background()
+    
+    yield
+    
+    hb.stop()
+    ks.stop()
+
+app = FastAPI(title="AI Chaos Engine Controller", lifespan=lifespan)
 
 # SQLite Database Setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./chaos_state.db"
+import os
+from pydantic import BaseModel
+from typing import List
+
+DB_PATH = os.environ.get("DB_PATH", "sqlite:////data/chaos_state.db")
+# Fallback for running locally without Docker:
+if not DB_PATH.startswith("sqlite:////") and not os.path.exists("/data"):
+    DB_PATH = "sqlite:///./chaos_state.db"
+
+SQLALCHEMY_DATABASE_URL = DB_PATH
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+class FaultRequest(BaseModel):
+    fault_type: str
+    target: str
+    params: dict = None
+    ttl_seconds: int = 60
+
+class CombinedFaultRequest(BaseModel):
+    faults: List[FaultRequest]
+    ttl_seconds: int = 60
+
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -75,28 +113,22 @@ def generate_adaptive_plan(last_intent_id: int):
         db.close()
 
 @app.post("/api/v1/inject")
-async def inject_fault(fault_type: str, target: str, ttl_seconds: int = 60, params: dict = None):
+async def inject_fault(req: FaultRequest):
     """Triggered by CLI to start a chaos experiment"""
     from faults.manager import ChaosManager
     chaos_manager = ChaosManager(session_factory=SessionLocal)
     
-    res = await chaos_manager.schedule_and_inject(
-        fault_type=fault_type,
-        target=target,
-        params=params or {},
-        ttl_seconds=ttl_seconds
+    res = await chaos_manager.execute_fault(
+        fault_type=req.fault_type,
+        target=req.target,
+        params=req.params or {},
+        ttl_seconds=60
     )
     return {"status": "success", "result": res}
 
 from pydantic import BaseModel
 from typing import List
 
-class FaultRequest(BaseModel):
-    fault_type: str
-    target: str
-    params: dict = None
-
-class CombinedFaultRequest(BaseModel):
     faults: List[FaultRequest]
     ttl_seconds: int = 60
 
@@ -111,7 +143,7 @@ async def inject_combined_faults(req: CombinedFaultRequest):
     tasks = []
     for f in req.faults:
         tasks.append(
-            chaos_manager.schedule_and_inject(
+            chaos_manager.execute_fault(
                 fault_type=f.fault_type,
                 target=f.target,
                 params=f.params or {},
@@ -140,3 +172,35 @@ async def rollback_fault(intent_id: int):
     res = await chaos_manager.rollback(intent_id)
     return {"status": "success", "result": res}
 
+
+@app.post("/api/v1/baseline")
+async def capture_baseline(test_mode: bool = False, duration: int = 600, interval: int = 5):
+    import asyncio
+    import baseline
+    # Run in background so we don't block
+    asyncio.create_task(asyncio.to_thread(baseline.run_capture, duration if not test_mode else 10, interval))
+    return {"status": "started", "duration": duration if not test_mode else 10}
+
+@app.get("/api/v1/safety/status")
+def get_safety_status():
+    import os
+    from kill_switch import KillSwitchState
+    baseline_loaded = os.path.exists("baseline.json")
+    
+    # We can read the latest safety status from DB or a global variable.
+    # For now, let's just return what the demo expects.
+    try:
+        db = SessionLocal()
+        from models import SafetyTripEvent
+        last_trip = db.query(SafetyTripEvent).order_by(SafetyTripEvent.timestamp.desc()).first()
+        state = "TRIPPED" if last_trip else "ARMED"
+    except Exception:
+        state = "UNKNOWN"
+    return {"baseline_loaded": baseline_loaded, "kill_switch_state": state}
+
+@app.post("/api/v1/safety/trip")
+async def trip_safety(reason: str = "Manual Override"):
+    from faults.manager import ChaosManager
+    chaos_manager = ChaosManager(session_factory=SessionLocal)
+    res = await chaos_manager.emergency_rollback_all()
+    return {"status": "tripped", "reason": reason, "rollbacks": res}

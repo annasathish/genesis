@@ -24,7 +24,7 @@ We use Stan's Robot Shop (a microservice e-commerce app) injected with Toxiproxy
 ```bash
 git clone https://github.com/annasathish/genesis.git
 cd genesis
-make app-up
+make sandbox-up
 ```
 *Wait 2-3 minutes for the 11 containers to fully initialize.*
 
@@ -35,8 +35,8 @@ export USE_LLM="true"
 export GEMINI_API_KEY="your_actual_api_key_here"
 
 # Install dependencies and start the FastAPI server
-make setup
-make ai-up
+make pull
+make controller-up
 ```
 
 ### Step 3: View the Live Dashboard

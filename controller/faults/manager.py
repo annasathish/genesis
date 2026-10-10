@@ -194,6 +194,22 @@ class ChaosManager:
 
             final_status = "success" if verified else "aborted"
             intent.status = final_status
+            
+            # Create ExperimentResult so reporter sees it
+            try:
+                from models import ExperimentResult
+                res = ExperimentResult(
+                    intent_id=intent_id,
+                    target_service=target,
+                    # We can't know exact metrics here without passing telemetry, 
+                    # but we create the row. The telemetry loop can update it, 
+                    # or it just records that it finished.
+                    details=details or {"error": error_msg} if error_msg else {}
+                )
+                db.add(res)
+            except ImportError:
+                pass
+                
             db.commit()
 
             return {
