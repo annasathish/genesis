@@ -70,26 +70,36 @@ def generate_adaptive_plan(last_intent_id: int):
     finally:
         db.close()
 
+_chaos_manager = None
+
+
+def get_chaos_manager():
+    """One ChaosManager per process, so TTL auto-rollback tasks stay referenced
+    (a per-request instance is garbage-collected with its pending TTL task)."""
+    global _chaos_manager
+    if _chaos_manager is None:
+        from faults.manager import ChaosManager
+        _chaos_manager = ChaosManager(session_factory=SessionLocal)
+    return _chaos_manager
+
+
 @app.post("/api/v1/inject")
 async def inject_fault(fault_type: str, target: str, ttl_seconds: int = 60, params: dict = None):
     """Triggered by CLI to start a chaos experiment"""
-    from faults.manager import ChaosManager
-    chaos_manager = ChaosManager(session_factory=SessionLocal)
-    
-    res = await chaos_manager.schedule_and_inject(
-        fault_type=fault_type,
+    res = await get_chaos_manager().execute_fault(
         target=target,
+        fault_type=fault_type,
         params=params or {},
-        ttl_seconds=ttl_seconds
+        ttl_seconds=ttl_seconds,
     )
     return {"status": "success", "result": res}
 
 @app.post("/api/v1/rollback/{intent_id}")
 async def rollback_fault(intent_id: int):
     """Manual rollback override"""
-    from faults.manager import ChaosManager
-    chaos_manager = ChaosManager(session_factory=SessionLocal)
-    
-    res = await chaos_manager.rollback(intent_id)
+    res = await get_chaos_manager().rollback(intent_id)
     return {"status": "success", "result": res}
 
+@app.get("/api/v1/intents/active")
+async def active_intents():
+    return await get_chaos_manager().get_active_intents()
