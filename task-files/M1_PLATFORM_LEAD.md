@@ -1,3 +1,16 @@
+# 🌍 Global Project Context for AGY CLI
+
+**Project:** AI-Driven Chaos Engineering Platform
+**Hackathon Goal:** Build an autonomous system that intelligently injects controlled failures into a local sandbox environment, observes impact, and outputs a resilience score.
+**Target App:** Stan's Robot Shop (`instana/robot-shop`) [Fallback: Cisco's Martian Bank]
+**Strict Hardware Constraint:** The host Windows WSL2 machine has only **5.2 GB of free RAM**. You MUST prioritize lightweight code, async non-blocking operations, and strict memory caps.
+**System Architecture:**
+- `sandbox/`: The isolated docker-compose project running the target application.
+- `controller/`: The isolated docker-compose project running the FastAPI/SQLite chaos backend.
+**Team Structure:** This project is split across 5 roles (M1-M5). You are executing one specific piece. Ensure your code exposes clean interfaces (like SQLite schemas or Makefile targets) so the other 4 AGY agents can easily integrate with your work.
+
+---
+
 # M1 - Platform Lead Tasks
 
 **Role Objective:** Set up the isolated sandbox environment using **Stan's Robot Shop** (with Martian Bank as a backup), ensure system limits are respected to prevent crashing the 5.2GB free RAM host, and wire up the network routing for fault injection.
