@@ -40,7 +40,7 @@ Makefile, TOOLS_AND_LIBS.md, scripts/setup-wslconfig.ps1
 | Service | Tier label | Notes |
 | --- | --- | --- |
 | web | gateway | nginx + UI, proxies `/api/<svc>/` to each service |
-| catalogue, user, cart, shipping, ratings, payment | service | shipping is Java (heap capped 384m) |
+| catalogue, user, cart, shipping, ratings, payment | service | shipping is Java (heap capped 512m) |
 | dispatch | worker | consumes `orders` queue from RabbitMQ |
 | mongodb, mysql | database | |
 | redis | cache | |
@@ -126,7 +126,8 @@ Sandbox caps total ~3.2 GB; expected real use ~1.5-2 GB (measure with `make stat
 | Symptom | Fix |
 | --- | --- |
 | `mongodb` exits at start, log mentions `wiredTigerEngineConfigString` or "No space left" | remove the `--wiredTigerEngineConfigString` pair from the override and raise its tmpfs to 256M (mem_limit 576m) |
-| `shipping` logs `Java heap space` / exits 137 | heap too small: raise `-Xmx` (now 384m) and `mem_limit` (now 640m) together |
+| `shipping` logs `Java heap space`, exits 3 or 137, or is `unhealthy` with all requests timing out | heap too small for `/cities` payloads: raise `-Xmx` (now 512m) and `mem_limit` (now 960m) together. `-XX:+ExitOnOutOfMemoryError` makes an OOM a crash, not a hang |
+| 502 from `web` right after a service was recreated | nginx in `web` cached the old container IP: `docker compose restart web` (M3/M4: do this after any recreate, not after a plain restart/stop-start) |
 | `mysql` unhealthy > 4 min on first start | still importing cities: `make logs svc=mysql` |
 | `load` exits immediately | Locust tag without `--autostart`: set `LOCUST_TAG` in `sandbox/.env` to a recent 2.x |
 | `'!override' ... unknown tag` | Docker Compose older than 2.24.4: update Docker Desktop |

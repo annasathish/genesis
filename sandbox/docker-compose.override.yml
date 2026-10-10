@@ -115,14 +115,17 @@ services:
       com.chaospilot.tier: service
 
   shipping:
-    # upstream runs -Xmx768m. 256m threw "Java heap space" on /cities/ru (large result set), so 384m.
-    # JVM uses more than the heap: code cache (default up to 240m) + metaspace + thread stacks, so those are capped too.
-    command: ["java", "-Xms64m", "-Xmn128m", "-Xmx384m", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=64m",
-              "-Xss512k", "-XX:+UseSerialGC", "-jar", "shipping.jar"]
+    # upstream runs -Xmx768m. /cities/<code> loads a whole country into the heap (several MB per request):
+    # 256m threw "Java heap space"; 384m wedged Tomcat after ~20 min (OOM inside a Tomcat thread -> port open,
+    # no responses, healthcheck timing out, CPU ~0). 512m holds the load; ExitOnOutOfMemoryError turns any
+    # future OOM into a visible crash (exit 3) instead of a silent hang.
+    # JVM uses more than the heap: code cache + metaspace + thread stacks, so those are capped too.
+    command: ["java", "-Xms128m", "-Xmn128m", "-Xmx512m", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=64m",
+              "-XX:+UseSerialGC", "-XX:+ExitOnOutOfMemoryError", "-jar", "shipping.jar"]
     environment:
       DB_HOST: toxiproxy:3306                                # shipping_to_mysql (used as jdbc:mysql://<DB_HOST>/cities)
       CART_ENDPOINT: toxiproxy:18080                         # shipping_to_cart
-    mem_limit: 768m
+    mem_limit: 960m
     healthcheck: {start_period: 120s}
     labels:
       <<: *target
@@ -190,7 +193,7 @@ services:
               "--autostart", "--users", "${LOCUST_USERS:-10}", "--spawn-rate", "2"]
     volumes: ["./locust:/mnt/locust:ro"]
     ports: ["127.0.0.1:8089:8089"]   # UI + REST: /stats/requests, /swarm, /stop
-    mem_limit: 512m                  # 256m was OOM-killed after ~12 min
+    mem_limit: 768m                  # 256m OOM-killed; plateaus ~390m at 10 users, headroom for the 100-user spike
     restart: unless-stopped          # infra: load must survive on its own (app targets have no restart policy)
     networks: [robot-shop]
     labels:
