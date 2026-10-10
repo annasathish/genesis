@@ -97,12 +97,12 @@ def _get_during_fault_metrics(
 def _classify_criticality(score_10: float) -> str:
     """Map a /10 score to a human-readable criticality label."""
     if score_10 <= 3.0:
-        return "🔴 Critical"
+        return "Critical"
     if score_10 <= 5.0:
-        return "🟠 High"
+        return "High"
     if score_10 <= 7.0:
-        return "🟡 Medium"
-    return "🟢 Low"
+        return "Medium"
+    return "Low"
 
 
 # ── Core Report Builder ────────────────────────────────────────────
@@ -178,6 +178,7 @@ def generate_report(
                 "kill_switch_fired": result.kill_switch_fired,
                 **score,
                 "llm_analysis": analysis.get("explanation"),
+                "analysis": analysis.get("explanation"),
                 "recommended_fix": analysis.get("recommended_fix"),
             }
             experiments.append(exp_data)
@@ -187,6 +188,8 @@ def generate_report(
                 "fault_type": intent.fault_type,
                 "score": score["score_out_of_10"],
                 "criticality": _classify_criticality(score["score_out_of_10"]),
+                "recommended_fix": analysis.get("recommended_fix"),
+                "analysis": analysis.get("explanation"),
             })
 
         # Sort weaknesses by score ascending (worst first)
