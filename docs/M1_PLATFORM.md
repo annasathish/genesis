@@ -103,6 +103,7 @@ Mongo and Redis data are in RAM: a restart of those containers re-seeds Mongo an
 - Env set for you: `SANDBOX_PROJECT=robotshop` (**not** `robot-shop`), `TOXIPROXY_URL`, `LOCUST_URL`, `RABBITMQ_API`, `APP_URL`, `TARGET_LABEL`, `CHAOS_DB_URL` and `CHAOS_DB_PATH` (= `sqlite:////data/chaos_state.db`), `HEARTBEAT_FILE=/data/heartbeat.json`, `GEMINI_API_KEY` (from `controller/.env`, gitignored).
 - `/data` is a named volume shared by api + watchdog. SQLite and the heartbeat must live there: on the Windows bind mount (`/app`) SQLite file locking breaks with two writers.
 - Team targets: `make baseline [dur=600]` (runs in `api`), `make report`, `make test`, `make watchdog-up`.
+- Test status at merge of main 6592960: 118 pass, 1 fail (`tests/test_main_safety.py`, issue 1). M3 tests need `pytest` + `pytest-asyncio` and must run from `controller/` (`make test` does both).
 
 ### Integration issues found when merging main @ a95eb3c (owners, please fix)
 
@@ -113,9 +114,9 @@ Mongo and Redis data are in RAM: a restart of those containers re-seeds Mongo an
 | 3 | M2/M4/M5 | DB path: `main.py`/`cli.py` use `./chaos_state.db`, kill_switch/baseline/watchdog use `CURRENT_DIR/chaos_state.db`, reporter reads `CHAOS_DB_PATH` | three code paths, the first two on the Windows bind mount | all read `os.environ.get("CHAOS_DB_URL", "sqlite:///./chaos_state.db")` |
 | 4 | M4 | rollback only calls `c.start()` when status != running | a paused container (`docker pause` fault) is not unpaused (`start` fails on paused); tmpfs fill files are never removed; a hung-but-running service (see shipping finding) is not restarted | handle `paused` -> `unpause()`; delete `/data/db/chaos_fill`, `/data/chaos_fill`, `/chaos/chaos_fill`; restart containers whose health is `unhealthy`; then `restart web` if any container was recreated |
 | 5 | M4 | allowed-services list includes `load`, omits `payment-gateway` | a stopped payment-gateway is never revived | select by label `com.chaospilot.role=target` instead of a hard-coded list |
-| 6 | M3 (`feature/m3-chaos-engine`, not merged) | `disk_stress.py` targets mysql `/var/lib/mysql` | not tmpfs here, so its own tmpfs check refuses: MySQL disk fault always fails; redis has no entry | mysql -> `/chaos`, add `redis: /data` (table "Disk exhaustion mounts") |
+| 6 | M3 (merged in main 6592960) | `disk_stress.py` targets mysql `/var/lib/mysql` | not tmpfs here, so its own tmpfs check refuses: MySQL disk fault always fails; redis has no entry | mysql -> `/chaos`, add `redis: /data` (table "Disk exhaustion mounts") |
 | 6b | M3 | `docker_client.resolve_container` filters only `com.docker.compose.service=<name>` | `web`, `mysql` etc. also exist in the Martian Bank backup and in any other project: it can stop the wrong container | add filters `com.docker.compose.project=robotshop` and `com.chaospilot.role=target` |
-| 6c | M3 | `container_crash` rollback is `docker start`; requirements add unpinned `docker>=7.0.0`, `httpx>=0.27.0` | a restarted container may get a new IP, so `web` returns 502 until restarted; requirements will conflict with the pinned ones on main | after start, `restart web` if the target is behind it; keep the pinned versions when merging |
+| 6c | M3 | `container_crash` rollback is `docker start` | a restarted container may get a new IP, so `web` returns 502 until restarted | after start, `restart web` if the target is behind it (M1 kept the pinned `docker==7.1.0`, `httpx==0.27.2` when merging) |
 | 7 | M2/M5 | `google-generativeai` is deprecated (FutureWarning on import) | works today, no fixes upstream | move to `google-genai` when convenient |
 
 ## Deviations from the M1 task file (and why)

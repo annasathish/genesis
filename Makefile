@@ -104,8 +104,9 @@ stop:           ## M3/M4: kill switch + rollback
 report:         ## M5
 	$(CTL) exec api python cli.py report
 
-test:           ## unit tests (host Python; needs controller/requirements.txt installed)
-	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v
+test:           ## all unit tests (host Python; pip install -r controller/requirements.txt pytest pytest-asyncio)
+	$(PYTHON) -m pytest -q tests controller/test_reporting.py
+	cd controller && $(PYTHON) -m pytest -q tests
 
 controller-dev: ## run the API on the host instead of Docker (debugging only)
 	cd controller && $(PYTHON) -m uvicorn main:app --host 127.0.0.1 --port 8000
