@@ -1109,8 +1109,6 @@ function renderDQTable() {
 }
 async function dqAction(kind) {
   const btn = $("dq-" + kind);
-  if (kind === "fix" && !armed(btn, "Click again to apply the fixes")) return;
-  if (kind === "dfix" && !armed(btn, "Click again to fix the dataset")) return;
   const label = btn.dataset.label || btn.textContent;
   document.querySelectorAll("[id^=dq-]").forEach((b) => { if (b.tagName === "BUTTON") b.disabled = true; });
   btn.textContent = { inject: "Entering messy data…", scan: "Scanning…", fix: "Fixing…", reset: "Resetting…", dscan: "Scanning 20,300 lines…", dfix: "Fixing…" }[kind];
