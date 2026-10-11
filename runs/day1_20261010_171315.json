@@ -1,0 +1,546 @@
+{
+  "target": "catalogue",
+  "fault": "container_crash",
+  "label": "",
+  "window_s": 5.0,
+  "started_at": "2026-10-10T17:11:55",
+  "windows": [
+    {
+      "t": 5.1,
+      "phase": "fault",
+      "req": 236,
+      "err": 0.038135593220338986,
+      "p95": 33,
+      "failing": [
+        "catalogue:categories",
+        "catalogue:product",
+        "ratings:rate"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          26,
+          0
+        ],
+        "catalogue:categories": [
+          27,
+          4
+        ],
+        "catalogue:product": [
+          27,
+          4
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          13,
+          0
+        ],
+        "ratings:fetch": [
+          27,
+          0
+        ],
+        "ratings:rate": [
+          7,
+          1
+        ],
+        "shipping:calc": [
+          13,
+          0
+        ],
+        "shipping:codes": [
+          13,
+          0
+        ],
+        "shipping:confirm": [
+          13,
+          0
+        ],
+        "shipping:match": [
+          13,
+          0
+        ],
+        "user:login": [
+          9,
+          0
+        ],
+        "user:uniqueid": [
+          16,
+          0
+        ],
+        "web:index": [
+          32,
+          0
+        ]
+      }
+    },
+    {
+      "t": 10.3,
+      "phase": "fault",
+      "req": 5,
+      "err": 0.4,
+      "p95": 33,
+      "failing": [
+        "cart:add",
+        "ratings:rate"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          1,
+          1
+        ],
+        "catalogue:categories": [
+          0,
+          0
+        ],
+        "catalogue:product": [
+          0,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          0,
+          0
+        ],
+        "ratings:fetch": [
+          0,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          1
+        ],
+        "shipping:calc": [
+          0,
+          0
+        ],
+        "shipping:codes": [
+          0,
+          0
+        ],
+        "shipping:confirm": [
+          0,
+          0
+        ],
+        "shipping:match": [
+          0,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          2,
+          0
+        ],
+        "web:index": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "t": 15.4,
+      "phase": "fault",
+      "req": 3,
+      "err": 0.6666666666666666,
+      "p95": 33,
+      "failing": [
+        "cart:add",
+        "ratings:rate"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          1,
+          1
+        ],
+        "catalogue:categories": [
+          0,
+          0
+        ],
+        "catalogue:product": [
+          0,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          0,
+          0
+        ],
+        "ratings:fetch": [
+          0,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          1
+        ],
+        "shipping:calc": [
+          0,
+          0
+        ],
+        "shipping:codes": [
+          0,
+          0
+        ],
+        "shipping:confirm": [
+          0,
+          0
+        ],
+        "shipping:match": [
+          0,
+          0
+        ],
+        "user:login": [
+          0,
+          0
+        ],
+        "user:uniqueid": [
+          0,
+          0
+        ],
+        "web:index": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "t": 27.6,
+      "phase": "recovery",
+      "req": 139,
+      "err": 0.35251798561151076,
+      "p95": 33,
+      "failing": [
+        "cart:add",
+        "catalogue:categories",
+        "catalogue:product",
+        "ratings:fetch",
+        "ratings:rate",
+        "user:login",
+        "user:uniqueid",
+        "web:index"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          3
+        ],
+        "catalogue:categories": [
+          22,
+          8
+        ],
+        "catalogue:product": [
+          22,
+          12
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          22,
+          12
+        ],
+        "ratings:rate": [
+          5,
+          1
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          5,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          5,
+          3
+        ],
+        "user:uniqueid": [
+          8,
+          3
+        ],
+        "web:index": [
+          16,
+          7
+        ]
+      }
+    },
+    {
+      "t": 32.9,
+      "phase": "recovery",
+      "req": 102,
+      "err": 0.0,
+      "p95": 33,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          12,
+          0
+        ],
+        "catalogue:categories": [
+          13,
+          0
+        ],
+        "catalogue:product": [
+          13,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          13,
+          0
+        ],
+        "ratings:rate": [
+          4,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          6,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          6,
+          0
+        ],
+        "web:index": [
+          13,
+          0
+        ]
+      }
+    },
+    {
+      "t": 38.1,
+      "phase": "recovery",
+      "req": 129,
+      "err": 0.0,
+      "p95": 33,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          16,
+          0
+        ],
+        "catalogue:categories": [
+          15,
+          0
+        ],
+        "catalogue:product": [
+          15,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          8,
+          0
+        ],
+        "ratings:fetch": [
+          15,
+          0
+        ],
+        "ratings:rate": [
+          3,
+          0
+        ],
+        "shipping:calc": [
+          8,
+          0
+        ],
+        "shipping:codes": [
+          8,
+          0
+        ],
+        "shipping:confirm": [
+          8,
+          0
+        ],
+        "shipping:match": [
+          8,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          8,
+          0
+        ],
+        "web:index": [
+          15,
+          0
+        ]
+      }
+    }
+  ],
+  "baseline": {
+    "requests": 579,
+    "error_rate": 0.0,
+    "p95_ms": 33,
+    "threshold": 0.05,
+    "duration_s": 30.1,
+    "ep": {
+      "cart:add": [
+        44,
+        0
+      ],
+      "catalogue:categories": [
+        94,
+        0
+      ],
+      "catalogue:product": [
+        94,
+        0
+      ],
+      "catalogue:products": [
+        0,
+        0
+      ],
+      "payment:pay": [
+        22,
+        0
+      ],
+      "ratings:fetch": [
+        94,
+        0
+      ],
+      "ratings:rate": [
+        15,
+        0
+      ],
+      "shipping:calc": [
+        22,
+        0
+      ],
+      "shipping:codes": [
+        22,
+        0
+      ],
+      "shipping:confirm": [
+        22,
+        0
+      ],
+      "shipping:match": [
+        22,
+        0
+      ],
+      "user:login": [
+        12,
+        0
+      ],
+      "user:uniqueid": [
+        22,
+        0
+      ],
+      "web:index": [
+        94,
+        0
+      ]
+    }
+  },
+  "intent_id": 4,
+  "inject_result": {
+    "intent_id": 4,
+    "fault_type": "container_crash",
+    "target": "catalogue",
+    "params": {},
+    "status": "running",
+    "created_at": "2026-10-10T11:42:26.801915",
+    "expires_at": "2026-10-10T11:45:26.801915",
+    "ttl_seconds": 180,
+    "rollback_command": "docker start robotshop-catalogue-1"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 4,
+      "fault_type": "container_crash",
+      "target": "catalogue",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-10T11:42:53.237605",
+      "error": null,
+      "details": {
+        "fault_type": "container_crash",
+        "target": "catalogue",
+        "container": "robotshop-catalogue-1",
+        "action": "started"
+      }
+    }
+  },
+  "summary": {
+    "services_down": [
+      "robotshop-catalogue-1"
+    ],
+    "endpoints_failing": [
+      "cart:add",
+      "catalogue:categories",
+      "catalogue:product",
+      "ratings:rate"
+    ],
+    "peak_error_rate": 0.6666666666666666,
+    "time_to_detect_s": 15.4,
+    "time_to_recover_s": 15.7,
+    "recovered": true
+  }
+}

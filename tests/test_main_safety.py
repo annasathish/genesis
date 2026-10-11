@@ -2,7 +2,7 @@ import asyncio
 import os
 import sys
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTROLLER_DIR = os.path.join(REPO_ROOT, "controller")
@@ -12,6 +12,7 @@ if CONTROLLER_DIR not in sys.path:
 import httpx
 
 # Mock external models/engine during testing if necessary
+import main
 from main import app
 
 
@@ -49,16 +50,19 @@ class TestMainSafetyEndpoints(unittest.TestCase):
                 self.assertIn("heartbeat_active", hb_data)
 
                 # 5. Test Baseline Trigger endpoint
-                resp_bl = await client.post("/api/v1/baseline?test_mode=true")
-                self.assertEqual(resp_bl.status_code, 200)
-                bl_data = resp_bl.json()
-                self.assertEqual(bl_data["status"], "started")
+                with patch.object(main, "_capture_baseline_sync", return_value={"sample_count": 3}):
+                    resp_bl = await client.post("/api/v1/baseline?test_mode=true")
+                    self.assertEqual(resp_bl.status_code, 200)
+                    bl_data = resp_bl.json()
+                    self.assertEqual(bl_data["status"], "started")
+                    await asyncio.sleep(0.05)
 
                 # 6. Test Manual Trip endpoint
-                resp_trip = await client.post("/api/v1/safety/trip?reason=ManualTest")
-                self.assertEqual(resp_trip.status_code, 200)
-                trip_data = resp_trip.json()
-                self.assertEqual(trip_data["status"], "tripped")
+                with patch.object(main.kill_switch, "manual_trip", new=AsyncMock(return_value={"intent_ids": []})):
+                    resp_trip = await client.post("/api/v1/safety/trip?reason=ManualTest")
+                    self.assertEqual(resp_trip.status_code, 200)
+                    trip_data = resp_trip.json()
+                    self.assertEqual(trip_data["status"], "tripped")
 
         asyncio.run(run_test())
 

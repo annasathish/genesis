@@ -3,8 +3,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from models import ExperimentIntent, ExperimentResult, MetricsSnapshot
 import os
-import random
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -27,25 +27,42 @@ def get_dashboard():
 def get_metrics(db: Session = Depends(get_db)):
     # Fetch latest metrics snapshot
     latest = db.query(MetricsSnapshot).order_by(MetricsSnapshot.timestamp.desc()).first()
-    active = db.query(ExperimentIntent).filter(ExperimentIntent.status == "running").first()
+    active = (
+        db.query(ExperimentIntent)
+        .filter(ExperimentIntent.status.in_(["pending", "running"]))
+        .order_by(ExperimentIntent.id.desc())
+        .first()
+    )
     
-    error_rate = latest.error_rate if latest else random.uniform(0.001, 0.02)
-    p95 = latest.p95_latency if latest else random.uniform(50.0, 150.0)
+    error_rate = latest.error_rate if latest else 0.0
+    p95 = latest.p95_latency if latest else 0.0
     
-    kill_switch_open = (error_rate > 0.5) or (p95 > 2000.0)
+    from main import kill_switch
+
+    state = kill_switch.state.value
+    kill_switch_open = state in {"WARNING_WINDOW_1", "TRIPPED", "RECOVERING"}
     
-    status_msg = "🟢 SYSTEM STABLE"
-    if active:
+    if not latest:
+        status_msg = "⚪ WAITING FOR TELEMETRY"
+    elif state == "TRIPPED":
+        status_msg = "🛑 KILL SWITCH TRIPPED — ROLLBACK STARTED"
+    elif state == "RECOVERING":
+        status_msg = "🟠 SYSTEM RECOVERING"
+    elif active:
         status_msg = f"🔴 INJECTING FAILURE: {active.fault_type} on {active.target_service}"
-    elif kill_switch_open:
-        status_msg = "⚠️ SYSTEM RECOVERING"
+    elif state == "WARNING_WINDOW_1":
+        status_msg = "⚠️ SAFETY THRESHOLD BREACHED — CONFIRMING"
+    else:
+        status_msg = "🟢 SYSTEM STABLE"
         
     return {
         "error_rate": round(error_rate * 100, 2), # %
         "p95_latency": round(p95, 2),
         "kill_switch_open": kill_switch_open,
+        "kill_switch_state": state,
         "status_badge": status_msg,
-        "timestamp": datetime.utcnow().strftime("%H:%M:%S")
+        "timestamp": latest.timestamp.astimezone(timezone.utc).strftime("%H:%M:%S") if latest and latest.timestamp else datetime.now(timezone.utc).strftime("%H:%M:%S"),
+        "rmq_depth": getattr(latest, "rmq_depth", 0) if latest else 0
     }
 
 @router.get("/api/v1/rankings")
@@ -65,7 +82,8 @@ def get_rankings(db: Session = Depends(get_db)):
         if t not in scores:
             scores[t] = {"error": 0.0, "recovery": 0.0, "cascade": 0.0, "count": 0}
             
-        spike = (1.0 - (res.resilience_score or 1.0)) * 100
+        resilience = res.resilience_score if res.resilience_score is not None else 1.0
+        spike = (1.0 - resilience) * 100
         rec = min(res.recovery_time_sec or 0.0, 300) / 300 * 100
         
         scores[t]["error"] += spike
@@ -81,16 +99,18 @@ def get_rankings(db: Session = Depends(get_db)):
         cas = data["cascade"] / c
         
         if data["count"] == 0:
-            e = random.uniform(0, 15)
-            r = random.uniform(0, 10)
-            cas = random.uniform(0, 5)
-            if s in ["rabbitmq", "mongodb", "redis"]: e += 30 # Inherently riskier in heuristics
+            e, r, cas = 0.0, 0.0, 0.0
                 
         hv = (e * 0.4) + (r * 0.3) + (cas * 0.3)
         
-        status = "STABLE"
-        if hv > 50: status = "CRITICAL"
-        elif hv > 20: status = "FRAGILE"
+        if data["count"] == 0:
+            status = "WAITING"
+        elif hv > 50:
+            status = "CRITICAL"
+        elif hv > 20:
+            status = "FRAGILE"
+        else:
+            status = "STABLE"
         
         rankings.append({
             "service": s,
@@ -103,99 +123,86 @@ def get_rankings(db: Session = Depends(get_db)):
     return rankings[:10]
 
 import json
-import google.generativeai as genai
+import logging
 
-# Global cache to prevent spamming the LLM every 2 seconds
+# Bound LLM calls while allowing current experiment telemetry to refresh.
 LLM_INSIGHT_CACHE = {}
+LLM_INSIGHT_CACHE_TTL_SECONDS = 15
 
 @router.get("/api/v1/business-insights")
 def get_insights(db: Session = Depends(get_db)):
     intent = db.query(ExperimentIntent).order_by(ExperimentIntent.id.desc()).first()
-    
+    latest = db.query(MetricsSnapshot).order_by(MetricsSnapshot.timestamp.desc()).first()
     if not intent:
         return {
-            "churn_risk": "LOW",
-            "funnel_impact": "System Operating Normally. No funnel blocks.",
-            "dau_impact": "0%",
-            "revenue_at_risk": "$0",
-            "sla_depletion": "0%",
-            "support_volume": "Normal",
-            "roi_recommendation": "System healthy. Monitor for architectural drift."
+            "churn_risk": "UNKNOWN",
+            "funnel_impact": "Run a sandbox experiment to connect a fault to an observed user flow.",
+            "dau_impact": "Not measured by this sandbox",
+            "revenue_at_risk": "Not measured",
+            "sla_depletion": "Not measured",
+            "support_volume": "Not measured by this sandbox",
+            "roi_recommendation": "Capture a baseline, then preview a dependency-aware experiment.",
+            "impact_basis": "The sandbox records service telemetry; it does not contain production business data.",
         }
-        
-    intent_id = intent.id
+
     target = intent.target_service
     fault_type = intent.fault_type
-    
-    # Return cached response if we already generated it for this experiment
-    if intent_id in LLM_INSIGHT_CACHE:
-        return LLM_INSIGHT_CACHE[intent_id]
-        
-    is_active = intent.status == "running"
-    
-    # Try LLM if enabled
-    if os.environ.get("USE_LLM", "false").lower() == "true":
-        try:
-            genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "DUMMY_KEY"))
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            
-            prompt = f"""
-            You are a Business Metrics Architect and Site Reliability Engineer. 
-            A chaos experiment is currently targeting the e-commerce microservice '{target}' with fault '{fault_type}'.
-            Estimate the business and financial impact of this failure. 
-            Return strictly a JSON object with these keys:
-            - churn_risk (string: HIGH, MEDIUM, LOW)
-            - funnel_impact (string: 1-2 sentences describing user experience impact)
-            - dau_impact (string: e.g. "15% Bounce Rate Spike")
-            - revenue_at_risk (string: e.g. "$45,000")
-            - sla_depletion (string: e.g. "4.2%")
-            - support_volume (string: 1 sentence predicted support ticket surge)
-            - roi_recommendation (string: 1 sentence architectural fix to save money)
-            Do not include markdown or backticks.
-            """
-            response = model.generate_content(prompt)
-            raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-            insight_data = json.loads(raw_text)
-            
-            LLM_INSIGHT_CACHE[intent_id] = insight_data
-            return insight_data
-        except Exception as e:
-            print(f"Dashboard LLM generation failed, falling back to heuristics: {e}")
-            
-    # Fallback Heuristics
-    base_rev_per_min = 2500
-    
-    if target in ["payment", "cart", "redis"]:
-        insight_data = {
-            "churn_risk": "HIGH",
-            "funnel_impact": "Critical Failure in Checkout Funnel. 100% Cart Abandonment.",
-            "dau_impact": "15% Bounce Rate Spike",
-            "revenue_at_risk": f"${base_rev_per_min * (15 if is_active else 2):,}",
-            "sla_depletion": "4.2%",
-            "support_volume": "Predicted 45% surge in 'Payment Failed' tickets.",
-            "roi_recommendation": f"Implement Redis-backed Circuit Breaker on {target.upper()} to save est. $45,000 in annualized SLA fines."
-        }
-    elif target in ["rabbitmq", "shipping", "mongodb"]:
-        insight_data = {
-            "churn_risk": "MEDIUM",
-            "funnel_impact": "Asynchronous processing delayed. Orders stuck in 'Pending'.",
-            "dau_impact": "5% Bounce Rate Spike",
-            "revenue_at_risk": f"${base_rev_per_min * (5 if is_active else 1):,}",
-            "sla_depletion": "1.5%",
-            "support_volume": "Predicted 20% surge in 'Where is my order' tickets.",
-            "roi_recommendation": f"Deploy dead-letter queue for {target.upper()} to reduce cloud waste by 12%."
-        }
+    error_rate = float(latest.error_rate) if latest and latest.error_rate is not None else 0.0
+    p95_ms = float(latest.p95_latency) if latest and latest.p95_latency is not None else 0.0
+    risk = "HIGH" if error_rate >= 0.05 else "MEDIUM" if error_rate >= 0.01 or p95_ms >= 500 else "LOW"
+    observed_revenue_proxy = 100.0 * error_rate
+    impact_basis = (
+        "Illustrative proxy only: observed request error rate × an assumed $100/min sandbox revenue baseline. "
+        "No production revenue, DAU, churn, or support data is available."
+    )
+    if target in {"cart", "payment"}:
+        funnel = "Checkout path is the likely affected flow; verify against the observed error and latency change."
+        recommendation = f"Add bounded timeouts and a circuit breaker around {target} calls, then rerun this experiment."
+    elif target in {"rabbitmq", "shipping"}:
+        funnel = "Order processing may be delayed; inspect queue depth and downstream recovery."
+        recommendation = f"Add queue back-pressure and dead-letter handling around {target}, then rerun this experiment."
     else:
-        insight_data = {
-            "churn_risk": "LOW",
-            "funnel_impact": "Minor UI degradation. Core funnels operational.",
-            "dau_impact": "1% Bounce Rate Spike",
-            "revenue_at_risk": f"${base_rev_per_min * 0.5:,}",
-            "sla_depletion": "0.1%",
-            "support_volume": "No significant support volume predicted.",
-            "roi_recommendation": "System degrades gracefully. No immediate architectural changes required."
-        }
-        
-    LLM_INSIGHT_CACHE[intent_id] = insight_data
+        funnel = f"The {target} dependency was targeted; use the dependency map to inspect affected upstream flows."
+        recommendation = f"Add a fallback or timeout for callers of {target}, then rerun this experiment."
+
+    insight_data = {
+        "churn_risk": risk,
+        "funnel_impact": f"{funnel} Current sample: {error_rate:.1%} errors, {p95_ms:.0f} ms p95.",
+        "dau_impact": "Not measured by this sandbox",
+        "revenue_at_risk": f"~${observed_revenue_proxy:.2f}/min (illustrative)",
+        "sla_depletion": "Not measured; compare the experiment window with your SLA objective.",
+        "support_volume": "Not measured by this sandbox; use request failures as the available proxy.",
+        "roi_recommendation": recommendation,
+        "impact_basis": impact_basis,
+    }
+
+    cache_key = (intent.id, round(error_rate, 4), round(p95_ms, 1))
+    cached = LLM_INSIGHT_CACHE.get(cache_key)
+    now = time.monotonic()
+    if cached and now - cached[0] < LLM_INSIGHT_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    if os.environ.get("USE_LLM", "false").lower() == "true" and os.environ.get("GEMINI_API_KEY"):
+        try:
+            from ai_client import generate_json
+
+            prompt = f"""
+            You are an SRE reviewing a sandbox-only chaos experiment.
+            Target: {target}; fault: {fault_type}.
+            Observed error rate: {error_rate:.2%}; observed p95 latency: {p95_ms:.1f} ms.
+            Explain one likely technical consequence and recommend one concrete resilience fix.
+            Do not invent revenue, DAU, churn, customer counts, or support-ticket figures.
+            Return JSON with keys "funnel_impact" and "roi_recommendation" only.
+            """
+            generated = json.loads(generate_json(prompt))
+            if isinstance(generated.get("funnel_impact"), str):
+                insight_data["funnel_impact"] = generated["funnel_impact"]
+            if isinstance(generated.get("roi_recommendation"), str):
+                insight_data["roi_recommendation"] = generated["roi_recommendation"]
+        except Exception as exc:
+            logger = logging.getLogger(__name__)
+            logger.warning("Dashboard AI insight unavailable; using telemetry-grounded guidance: %s", exc)
+
+    LLM_INSIGHT_CACHE[cache_key] = (now, insight_data)
     return insight_data
 

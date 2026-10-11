@@ -21,13 +21,13 @@ injects or rolls back anything, and runs as its own process on port 8050 (the co
 ### AI key (one place)
 
 ```bash
-cp controller/.env.example controller/.env      # then put your key after GEMINI_API_KEY=
+cp .env.example .env      # repo root; then put your key after GEMINI_API_KEY=
 ```
 
-`controller/.env` is gitignored. The dashboard re-reads it on every call, so the Copilot and AI briefs switch from
-"offline" to Gemini without a restart. The controller container (`make report --llm`) reads the same file but only on
-(re)start:
-`docker compose -f controller/docker-compose.yml up -d`.
+`.env` is gitignored. The dashboard re-reads it on every call (falling back to `controller/.env`), so the Copilot and
+AI briefs switch from "offline" to Gemini without a restart. The controller container (planner re-rank, `make report
+--llm`) gets `GEMINI_API_KEY` and `USE_LLM` from the same file, but only on (re)start:
+`docker compose --env-file .env -f controller/docker-compose.yml up -d` (what `make controller-up` runs).
 
 ---
 
@@ -177,6 +177,52 @@ pinned `google-generativeai==0.2.1`, so it always failed silently into the heuri
 fallback for every failure (no key, model gone, model hanging, quota, bad JSON). Models are tried in order:
 `CHAT_MODEL` / `gemini-flash-latest`, then the newest available `gemini-<version>-flash`; a model that 404s, hangs
 for `LLM_TIMEOUT_S` (20 s) or is out of free-tier quota is skipped, and the working one is remembered per process.
+
+## 5. Multi-agent findings report (Day 2)
+
+`controller/agents/`: three agents run by a coordinator. **Python computes every number; agents explain, rank and
+recommend.** Dashboard: **AI report** tab -> *Generate report*. CLI: `make findings` (`llm=0` for rules only).
+Output: `reports/FINDINGS_REPORT.md` + `reports/findings_report.json`.
+
+| Agent | Input | Output |
+| --- | --- | --- |
+| **Planner** (`planner.py`) | dependency map (`insights/live.py` EDGES, M2 `graph.json` kinds), M1 Toxiproxy edges, M3 injector targets, measured runs | executable candidates scored `100 x (0.40 revenue proximity + 0.20 blast radius + 0.25 novelty + 0.15 new fault type)`, a reason each, selection of at most 4 experiments, one per fault type |
+| **Analyzer** (`analyzer.py`) | per-experiment metrics, run-to-run verdicts | findings ranked by severity `100 x (0.4 error spike + 0.3 incident time + 0.3 cascade) + slowdown`, where error spike = worse of overall errors and failed checkouts; resilience score per experiment and overall (M5 `scorer.py`) |
+| **Recommender** (`recommender.py`) | Analyzer findings, business impact | one fix per weakness (M5 vocabulary + 2), priority = severity x projected annual cost, money protected, the exact command to verify the fix |
+
+Every agent (`base.py`) computes a full rule-based answer first, then asks Gemini (JSON mode) to improve wording and
+ranking. An AI field is accepted only if its ids are known, its category is allowed, and **every number in its text
+appears in the agent's input** (grounding check); otherwise the rule text stays and the reason is in the report's
+agent table. Gemini down, out of quota or hanging -> rule-based output, never a failed report.
+
+### Experiments (4, 3 failure types)
+
+| Experiment | Chosen by | Result |
+| --- | --- | --- |
+| `container_crash` on catalogue | day 1 | 4 runs; cascades to cart + ratings; run-to-run: no significant change |
+| `network_latency` 2000 ms on `payment_to_gateway` | Planner #1 (81.7) | no errors, `payment:pay` 21.5 -> 3141.9 ms (146x), 65.6 % of checkouts did not complete |
+| `container_crash` on payment | Planner #2 (66.7) | checkout hangs ~38 s (p95 38000 ms) instead of failing fast; 46.9 s to detect; 58.4 checkouts lost |
+| `rabbitmq_block` on rabbitmq | Planner #3 (65.0) | every checkout fails while the queue is down: payment publishes synchronously |
+
+### Re-run after a fix (stretch goal)
+
+`python scripts/apply_fix.py replicas --service catalogue --count 2` (or `make fix-replicas svc=catalogue n=2`), then
+`python scripts/day1_demo.py --target catalogue --label "fix: catalogue x2 replicas"`, then `apply_fix.py revert`.
+Runs labelled `fix: ...` form a new phase; the Experiments tab and the report compare phases with all runs pooled.
+
+| | Baseline, no change (4 runs) | fix: catalogue x2 replicas (2 runs) |
+| --- | --- | --- |
+| Error-minutes (mean) | 0.142 (noise band 0.112-0.183) | 0.0015 |
+| Fault-phase failures | 39 / 994 requests | 0 / 768 requests |
+| Verdict | | **improved**, -98.9 %, p = 2.8e-08 |
+| Side effect | | requests routed to the crashed replica hung up to ~51 s before failover (nginx's default 60 s connect timeout), so the resilience score fell 8.35 -> 5.9: the next fix is a short gateway connect timeout |
+
+The first four catalogue runs are repeats with nothing changed, which is why their bars do not trend: the chart
+shades that spread as the run-to-run noise band.
+
+`scripts/day1_demo.py` gained `--params` (JSON), a rolling p95, per-endpoint window latency (`lat`) and a slowdown
+breach rule (endpoint mean > 5x its baseline, M4's p95 rule), `web` restarted only after crashes, and rollback on
+Ctrl+C or crash.
 
 ## Tests
 

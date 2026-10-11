@@ -258,7 +258,7 @@ class TestReporter(unittest.TestCase):
         self.assertGreater(data["total_experiments"], 0)
 
     def test_heuristic_analysis_present(self):
-        """Each experiment should have an analysis and recommended fix."""
+        """Each experiment and weakness should have an analysis and recommended fix."""
         data = generate_report(
             db_url=self.db_url,
             use_llm=False,
@@ -268,6 +268,16 @@ class TestReporter(unittest.TestCase):
             self.assertIsNotNone(exp["llm_analysis"])
             self.assertIsNotNone(exp["recommended_fix"])
             self.assertIn(exp["recommended_fix"], [
+                "Increase Replicas",
+                "Adjust Timeouts",
+                "Add Retries",
+                "Implement Circuit Breaker",
+            ])
+
+        for w in data["weaknesses"]:
+            self.assertIsNotNone(w["recommended_fix"])
+            self.assertIsNotNone(w["analysis"])
+            self.assertIn(w["recommended_fix"], [
                 "Increase Replicas",
                 "Adjust Timeouts",
                 "Add Retries",
@@ -288,6 +298,20 @@ class TestReporter(unittest.TestCase):
         self.assertIn("Per-Experiment Results", content)
         self.assertIn("Ranked Weaknesses", content)
         self.assertIn("Platform Safety Summary", content)
+        self.assertIn("Recommended Fix", content)
+
+    def test_cli_report_output_includes_analysis_and_fixes(self):
+        """CLI report command must print summary, weaknesses, analysis, and recommended fixes."""
+        from typer.testing import CliRunner
+        from cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["report", "--db", self.db_url, "--out", self.tmpdir])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Resilience Summary", result.stdout)
+        self.assertIn("Ranked Weaknesses (worst first)", result.stdout)
+        self.assertIn("Analysis & Recommended Fixes", result.stdout)
+        self.assertIn("Recommended Fix", result.stdout)
 
 
 if __name__ == "__main__":

@@ -25,21 +25,30 @@ Running list for the team form. Add a row whenever you add a dependency (owner =
 
 | Package | Licence | Use | Owner |
 | --- | --- | --- | --- |
-| fastapi, uvicorn | MIT, BSD-3 | Controller API | M2 |
+| fastapi 0.120, uvicorn | MIT, BSD-3 | Controller API + dashboard server | M2 |
 | SQLAlchemy, Alembic | MIT | SQLite state + migrations | M2 |
 | PyYAML | MIT | Compose parsing (mapper) | M2 |
 | networkx | BSD-3 | Dependency graph | M2 |
-| google-generativeai 0.2.1 | Apache-2.0 | Optional Gemini re-rank | M2 |
+| google-genai 2.x | Apache-2.0 | Google's supported Gemini SDK (`controller/ai_client.py` fallback; the primary path is the stdlib REST client `controller/insights/llm.py`) | M2 |
 | pydantic | MIT | API models | M2 |
 | docker (SDK) | Apache-2.0 | Fault injection, health | M3/M4 |
 | httpx | BSD-3 | Toxiproxy / Locust / RabbitMQ APIs | M3/M4 |
 | jinja2, typer | BSD-3, MIT | Report template, CLI | M5 |
+| Python stdlib (`urllib`, `hmac`, `statistics`, `math`) | PSF | Gemini REST client, PII pseudonymization, significance tests | Insights |
+
+## Dashboard (browser)
+
+| Library | Version | Licence | Use | Owner |
+| --- | --- | --- | --- | --- |
+| [Chart.js](https://www.chartjs.org) | 4.4.1 (cdnjs) | MIT | Live, trend, timeline and cost charts on `:8050` | Insights |
 
 ## AI models
 
 | Model | Provider | Use | Owner |
 | --- | --- | --- | --- |
-| gemini-2.5-flash | Google AI Studio | Optional candidate re-ranking + finding explanations (`--no-llm` is primary) | M2/M5 |
+| `gemini-flash-latest` (Google's alias for the current Flash model; served as gemini-3.8-flash, with automatic fallback to the newest available `gemini-<version>-flash`, e.g. gemini-3.6-flash) | Google AI Studio (Gemini API) | Multi-agent findings report (Planner, Analyzer, Recommender agents), Resilience Copilot chat, per-run AI briefs, M5 analyzer explanations, M2 planner re-rank. Every agent has a rule-based fallback, and AI text is only accepted if every number in it appears in the measured data | Insights / M2 / M5 |
+
+`gemini-2.5-flash` (the original choice) is closed to new API keys, so it is not used.
 
 ## Data used
 

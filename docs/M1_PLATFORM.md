@@ -100,7 +100,7 @@ Mongo and Redis data are in RAM: a restart of those containers re-seeds Mongo an
 - Code is bind-mounted from `controller/`, so edits apply on `docker compose -f controller/docker-compose.yml restart api`.
 - Image = `controller/Dockerfile` + `requirements.txt`. M1 added `alembic`, `docker`, `httpx` (imported by M2/M4 code, missing before).
 - Containers have the Docker socket, the sandbox network (reach `toxiproxy:8474`, `load:8089`, `rabbitmq:15672`, `web:8080` by name) and `../sandbox` at `/sandbox` (read-only).
-- Env set for you: `SANDBOX_PROJECT=robotshop` (**not** `robot-shop`), `TOXIPROXY_URL`, `LOCUST_URL`, `RABBITMQ_API`, `APP_URL`, `TARGET_LABEL`, `CHAOS_DB_URL` and `CHAOS_DB_PATH` (= `sqlite:////data/chaos_state.db`), `HEARTBEAT_FILE=/data/heartbeat.json`, `GEMINI_API_KEY` (from `controller/.env`, gitignored).
+- Env set for you: `SANDBOX_PROJECT=robotshop` (**not** `robot-shop`), `TOXIPROXY_URL`, `LOCUST_URL`, `RABBITMQ_API`, `APP_URL`, `TARGET_LABEL`, `CHAOS_DB_URL` and `CHAOS_DB_PATH` (= `sqlite:////data/chaos_state.db`), `HEARTBEAT_FILE=/data/heartbeat.json`, `GEMINI_API_KEY` and `USE_LLM` (from the repo-root `.env`, gitignored, passed by the Makefile with `--env-file .env`).
 - `/data` is a named volume shared by api + watchdog. SQLite and the heartbeat must live there: on the Windows bind mount (`/app`) SQLite file locking breaks with two writers.
 - Team targets: `make baseline [dur=600]` (runs in `api`), `make report`, `make test`, `make watchdog-up`.
 - Test status at merge of main 6592960: 118 pass, 1 fail (`tests/test_main_safety.py`, issue 1). M3 tests need `pytest` + `pytest-asyncio` and must run from `controller/` (`make test` does both).

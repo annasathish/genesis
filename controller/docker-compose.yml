@@ -29,9 +29,7 @@ x-common: &common
     RABBITMQ_API: http://rabbitmq:15672
     APP_URL: http://web:8080
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  env_file:
-    - path: .env
-      required: false
+    USE_LLM: ${USE_LLM:-true}
   networks: [default, sandbox]
   labels: *infra
   restart: unless-stopped

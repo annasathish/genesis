@@ -81,11 +81,13 @@ class BaselineCollector:
         output_file: str = "baseline.json",
         db_path: Optional[str] = None,
         telemetry_collector: Optional[TelemetryCollector] = None,
+        db_url: Optional[str] = None,
     ):
         self.duration_seconds = float(duration_seconds)
         self.interval_seconds = float(interval_seconds)
         self.output_file = output_file
         self.db_path = db_path or os.path.join(CURRENT_DIR, "chaos_state.db")
+        self.db_url = db_url or f"sqlite:///{self.db_path}"
 
         if telemetry_collector is not None:
             self.collector = telemetry_collector
@@ -109,10 +111,7 @@ class BaselineCollector:
             from sqlalchemy.orm import sessionmaker
             from models import Base
 
-            engine = create_engine(
-                f"sqlite:///{self.db_path}",
-                connect_args={"check_same_thread": False},
-            )
+            engine = create_engine(self.db_url, connect_args={"check_same_thread": False})
             Base.metadata.create_all(bind=engine)
             session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             return session_factory()
@@ -282,6 +281,7 @@ def main():
         interval_seconds=interval,
         locust_url=args.locust_url,
         output_file=args.output,
+        db_url=os.environ.get("CHAOS_DB_URL") or os.environ.get("DB_PATH"),
     )
 
     loop = asyncio.new_event_loop()

@@ -1,0 +1,244 @@
+{
+  "target": "catalogue",
+  "fault": "container_crash",
+  "windows": [
+    {
+      "t": 5.1,
+      "phase": "fault",
+      "req": 259,
+      "err": 0.007722007722007722,
+      "p95": 37,
+      "failing": [
+        "cart:add",
+        "ratings:rate"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 10.2,
+      "phase": "fault",
+      "req": 2,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 15.3,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 20.4,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 25.5,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 30.7,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 35.7,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 40.8,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 45.9,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 51.0,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 56.1,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 37,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 61.2,
+      "phase": "fault",
+      "req": 5,
+      "err": 1.0,
+      "p95": 37,
+      "failing": [
+        "catalogue:categories"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 66.3,
+      "phase": "fault",
+      "req": 20,
+      "err": 0.55,
+      "p95": 38,
+      "failing": [
+        "catalogue:categories",
+        "catalogue:product"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ]
+    },
+    {
+      "t": 75.4,
+      "phase": "recovery",
+      "req": 132,
+      "err": 0.24242424242424243,
+      "p95": 40,
+      "failing": [
+        "cart:add",
+        "catalogue:categories",
+        "catalogue:product",
+        "ratings:fetch",
+        "ratings:rate",
+        "user:login",
+        "user:uniqueid",
+        "web:index"
+      ],
+      "down": []
+    },
+    {
+      "t": 80.5,
+      "phase": "recovery",
+      "req": 100,
+      "err": 0.0,
+      "p95": 40,
+      "failing": [],
+      "down": []
+    },
+    {
+      "t": 85.6,
+      "phase": "recovery",
+      "req": 90,
+      "err": 0.0,
+      "p95": 40,
+      "failing": [],
+      "down": []
+    }
+  ],
+  "baseline": {
+    "requests": 648,
+    "error_rate": 0.0,
+    "p95_ms": 36,
+    "threshold": 0.05
+  },
+  "intent_id": 3,
+  "inject_result": {
+    "intent_id": 3,
+    "fault_type": "container_crash",
+    "target": "catalogue",
+    "params": {},
+    "status": "running",
+    "created_at": "2026-10-10T10:16:02.429018",
+    "expires_at": "2026-10-10T10:19:02.429018",
+    "ttl_seconds": 180,
+    "rollback_command": "docker start robotshop-catalogue-1"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 3,
+      "fault_type": "container_crash",
+      "target": "catalogue",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-10T10:17:19.361403",
+      "error": null,
+      "details": {
+        "fault_type": "container_crash",
+        "target": "catalogue",
+        "container": "robotshop-catalogue-1",
+        "action": "started"
+      }
+    }
+  },
+  "summary": {
+    "services_down": [
+      "robotshop-catalogue-1"
+    ],
+    "endpoints_failing": [
+      "cart:add",
+      "catalogue:categories",
+      "catalogue:product",
+      "ratings:rate"
+    ],
+    "peak_error_rate": 1.0,
+    "time_to_detect_s": 66.3,
+    "time_to_recover_s": 15.3,
+    "recovered": true
+  }
+}

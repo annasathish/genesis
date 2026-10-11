@@ -310,7 +310,8 @@ class DockerMonitor:
                 c_project = labels.get("com.docker.compose.project")
 
                 matched = True
-                if self.project_name and c_project:
+                if self.project_name:
+                    # a container without a compose project label (e.g. an unrelated local container) is not ours
                     matched = (c_project == self.project_name)
                 elif self.container_prefix:
                     matched = c_name.startswith(self.container_prefix)
@@ -439,6 +440,7 @@ class TelemetryCollector:
                 error_rate=float(snapshot.error_rate),
                 p95_latency=float(snapshot.p95_latency),
                 is_baseline=is_baseline,
+                rmq_depth=getattr(snapshot, 'rmq_depth', 0)
             )
             db_session.add(record)
             db_session.commit()

@@ -40,6 +40,7 @@ def checkout_loss(run: Dict[str, Any]) -> Dict[str, Any]:
         expected_per_window = base_ok / base_dur * win
         lost = 0.0
         loss_s = 0.0
+        peak = 0.0
         for w in windows:
             ok = _ok(w["ep"], CHECKOUT_ENDPOINT) or 0.0
             if expected_per_window <= 0:
@@ -47,9 +48,12 @@ def checkout_loss(run: Dict[str, Any]) -> Dict[str, Any]:
             frac = min(1.0, max(0.0, 1.0 - ok / expected_per_window))
             loss_s += frac * win
             lost += max(0.0, expected_per_window - ok)
+            if w["phase"] == "fault":
+                peak = max(peak, frac)
         return {
             "checkout_method": "measured",
             "checkout_loss_min": round(loss_s / 60, 3),
+            "checkout_peak_loss": round(peak, 4),
             "sandbox_checkouts_lost": round(lost, 1),
             "baseline_checkouts_per_min": round(base_ok / base_dur * 60, 2),
         }
@@ -58,9 +62,27 @@ def checkout_loss(run: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "checkout_method": "estimated_from_aggregate_errors",
         "checkout_loss_min": round(loss_s / 60, 3),
+        "checkout_peak_loss": None,
         "sandbox_checkouts_lost": None,
         "baseline_checkouts_per_min": None,
     }
+
+
+def slowest_endpoint(run: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Endpoint with the largest fault-window mean latency relative to its baseline mean (v3 runs)."""
+    base = run["baseline"].get("lat") or {}
+    best = None
+    for w in run["windows"]:
+        if w["phase"] != "fault":
+            continue
+        for name, ms in (w.get("lat") or {}).items():
+            b = base.get(name)
+            if not b:
+                continue
+            ratio = ms / max(b, 1.0)
+            if best is None or ratio > best["ratio"]:
+                best = {"endpoint": name, "baseline_ms": b, "peak_ms": ms, "ratio": round(ratio, 1)}
+    return best
 
 
 def run_metrics(run: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,6 +118,9 @@ def run_metrics(run: Dict[str, Any]) -> Dict[str, Any]:
         "signature": run["signature"],
         "fault": run["fault"],
         "target": run["target"],
+        "service": run.get("service", run["target"]),
+        "edge": run.get("edge"),
+        "params": run.get("params", {}),
         "format": run["format"],
         "baseline_error_rate": run["baseline"]["error_rate"],
         "baseline_p95_ms": p95_base,
@@ -112,6 +137,10 @@ def run_metrics(run: Dict[str, Any]) -> Dict[str, Any]:
         "time_to_recover_s": ttr,
         "recovered": bool(s.get("recovered")),
         "blast_radius_endpoints": len(s.get("endpoints_failing", [])),
+        "endpoints_slow": s.get("endpoints_slow", []),
+        "evidence": s.get("evidence"),   # first failed health probe of the target through the shop (newer runs)
+        "slowest_endpoint": slowest_endpoint(run),
+        "slowest_endpoint_ms": (slowest_endpoint(run) or {}).get("peak_ms"),
         "endpoints_failing": s.get("endpoints_failing", []),
         "services_down": s.get("services_down", []),
         "resilience_score": score["score_out_of_10"],

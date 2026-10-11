@@ -1,11 +1,12 @@
 import yaml
 import json
 import os
+from pathlib import Path
 
 def generate_dependency_graph(compose_path: str):
     """
     Parses the docker-compose.yml file to build a static dependency graph.
-    Returns a JSON string representing nodes and edges.
+    Returns nodes, Compose edges, and configured Toxiproxy links.
     """
     if not os.path.exists(compose_path):
         return json.dumps({"error": f"Compose file not found at {compose_path}"})
@@ -18,6 +19,7 @@ def generate_dependency_graph(compose_path: str):
     
     services = compose_data.get('services', {})
     for service_name, config in services.items():
+        config = config or {}
         # Heuristic to determine kind based on name/image
         kind = "worker"
         if "redis" in service_name or "cache" in service_name:
@@ -40,7 +42,27 @@ def generate_dependency_graph(compose_path: str):
         for dependency in depends_on:
             edges.append({"source": service_name, "target": dependency})
             
-    graph = {"nodes": nodes, "edges": edges}
+    # Network faults need real Toxiproxy identifiers, which are link names
+    # rather than Compose service names. Read the sandbox's checked-in list.
+    proxy_path = Path(compose_path).resolve().parent / "toxiproxy" / "toxiproxy.json"
+    proxies = []
+    if proxy_path.is_file():
+        with proxy_path.open("r", encoding="utf-8") as proxy_file:
+            proxy_configs = json.load(proxy_file)
+        for proxy in proxy_configs:
+            name = proxy.get("name")
+            if not name:
+                continue
+            source, separator, dependency = name.partition("_to_")
+            proxies.append({
+                "name": name,
+                "source": source if separator else None,
+                "target": dependency if separator else None,
+                "listen": proxy.get("listen"),
+                "upstream": proxy.get("upstream"),
+            })
+
+    graph = {"nodes": nodes, "edges": edges, "proxies": proxies}
     
     with open("graph.json", "w") as out:
         json.dump(graph, out, indent=2)

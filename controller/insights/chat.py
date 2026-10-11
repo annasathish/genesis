@@ -39,6 +39,8 @@ contain the answer, say what is missing and which experiment would produce it.
 - Business figures are projections from the stated assumptions; say so when you use them.
 - LIVE holds the current system state (status, live error rate, failing services, active faults); use it for \
 "what is happening now" questions and say when telemetry is unavailable.
+- findings_report (when present) is the latest multi-agent report (Analyzer findings ranked by severity, \
+Recommender fixes by priority); next_experiments are the Planner agent's selected experiments with reasons.
 - Never output personal data. Tokens like user_ab12cd or [REDACTED] are masked on purpose: do not try to \
 reconstruct them.
 - Be concise: at most ~150 words unless asked for detail. Plain text, short bullet points allowed.
@@ -100,6 +102,8 @@ class Copilot:
             return self._a_run(run)
         intents = [
             (r"\b(now|right now|currently|live|status|happening|at the moment)\b", self._a_live),
+            (r"next experiment|test next|what to test|\bplan\b|planner", self._a_plan),
+            (r"\breport\b|findings|severity|weakness", self._a_report),
             (r"how .*(calculat|comput|measur|work out)|method|formula|definition", self._a_method),
             (r"pii|privacy|personal|mask|gdpr|dpdp|sensitive|anonymi|pseudonym", self._a_pii),
             (r"business|revenue|cost|money|loss|lost|order|customer|impact|dollar|\$|rupee|slo|budget", self._a_business),
@@ -150,6 +154,27 @@ class Copilot:
                      f"({ks.get('breach_windows', 0)}/{ks.get('consecutive_breach_windows', 2)} breach windows).")
         if live.get("active_faults"):
             lines.append("- Active faults: " + ", ".join(f"{a['fault']} on {a['target']}" for a in live["active_faults"]))
+        return "\n".join(lines)
+
+    def _a_plan(self) -> str:
+        nxt = self.facts.get("next_experiments")
+        if not nxt:
+            return "No plan yet: generate the AI findings report (AI report tab) to get the Planner's next experiments."
+        return "Planner agent, next experiments:\n" + "\n".join(
+            f"- {c['id']} (score {c['score']}): {c['reason']}" for c in nxt)
+
+    def _a_report(self) -> str:
+        r = self.facts.get("findings_report")
+        if not r:
+            return "No findings report yet: press Generate on the AI report tab."
+        if r.get("overall_resilience") is None:
+            return "The findings report has no experiments yet: run an experiment, then press Generate again."
+        lines = [f"Findings report ({r['generated_at']}): overall resilience {r['overall_resilience']}/10."]
+        lines += [f"- #{f['rank']} {f['severity']} ({f['severity_score']}): {f['fault']} on {f['target']}"
+                  for f in (r.get("findings") or [])[:5]]
+        recs = r.get("recommendations") or []
+        if recs:
+            lines.append(f"Top fix: {recs[0]['fix']} for {recs[0]['service']}: {recs[0]['action']}")
         return "\n".join(lines)
 
     def _a_help(self) -> str:

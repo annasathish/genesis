@@ -13,6 +13,7 @@ Sampling is rate-limited (one sample per MIN_INTERVAL_S however many browsers po
 import json
 import os
 import subprocess
+import urllib.error
 import threading
 import time
 import urllib.request
@@ -21,6 +22,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 LOCUST_URL = os.environ.get("LOCUST_HOST_URL", "http://127.0.0.1:8089")
+SHOP_URL = os.environ.get("SHOP_URL", "http://127.0.0.1:8080")
+# Health endpoints reached through the shop's own gateway (web/nginx), i.e. the path a shopper's browser uses.
+PROBES = {"web": "/", "catalogue": "/api/catalogue/health", "user": "/api/user/health", "cart": "/api/cart/health",
+          "shipping": "/api/shipping/health", "ratings": "/api/ratings/_health", "payment": "/api/payment/health"}
+PROBE_TIMEOUT_S = 2.0
 CONTROLLER_URL = os.environ.get("CONTROLLER_URL", "http://127.0.0.1:8000")
 TOXIPROXY_URL = os.environ.get("TOXIPROXY_HOST_URL", "http://127.0.0.1:8474")
 BASELINE_FILE = Path(__file__).resolve().parents[1] / "baseline.json"
@@ -78,8 +84,9 @@ def _load_thresholds() -> Dict[str, Any]:
 
 class LiveMonitor:
     def __init__(self, locust_url=LOCUST_URL, controller_url=CONTROLLER_URL, toxiproxy_url=TOXIPROXY_URL,
-                 docker_cmd=("docker",)):
+                 docker_cmd=("docker",), shop_url=SHOP_URL):
         self.locust_url, self.controller_url, self.toxiproxy_url = locust_url, controller_url, toxiproxy_url
+        self.shop_url = shop_url.rstrip("/")
         self.docker_cmd = list(docker_cmd)
         self.history: deque = deque(maxlen=HISTORY)
         self._prev: Optional[Dict[str, Any]] = None
@@ -88,6 +95,9 @@ class LiveMonitor:
         self._breaches = 0
         self._last_trip_at: Optional[float] = None
         self._lock = threading.Lock()
+        # last outage per service (probe failed or container not up), kept after the automatic rollback so the
+        # proof is still on screen when the evaluator looks: {svc: {start, end, probe, container}}
+        self.outages: Dict[str, Dict[str, Any]] = {}
 
     # ------------------------------------------------------------------ sources
     def _locust(self) -> Dict[str, Any]:
@@ -109,6 +119,37 @@ class LiveMonitor:
         active = [{"id": i.get("id") or i.get("intent_id"), "fault": i.get("fault_type"), "target": i.get("target_service")
                    or i.get("target"), "expires_at": i.get("expires_at")} for i in items if isinstance(i, dict)]
         return {"ok": True, "active": active}
+
+    def _safety(self) -> Dict[str, Any]:
+        """The controller's own kill switch + injection gate (GET /api/v1/safety/status, newer controllers)."""
+        try:
+            d = _get_json(f"{self.controller_url}/api/v1/safety/status")
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": type(exc).__name__}
+        return {"ok": True, "state": d.get("kill_switch_state"), "reason": d.get("kill_switch_reason"),
+                "is_safe_to_inject": d.get("is_safe_to_inject"), "safety_reason": d.get("safety_reason"),
+                "baseline_loaded": d.get("baseline_loaded"), "telemetry_age_s": d.get("telemetry_age_seconds"),
+                "thresholds": d.get("thresholds")}
+
+    def _probes(self) -> Dict[str, Any]:
+        """GET each service's health endpoint via the shop gateway, in parallel. A crashed service shows up as a
+        5xx from nginx or a timeout, independent of Locust's numbers."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one(item):
+            svc, path = item
+            t0 = time.time()
+            try:
+                with urllib.request.urlopen(self.shop_url + path, timeout=PROBE_TIMEOUT_S) as r:
+                    code, err = r.status, None
+            except urllib.error.HTTPError as e:
+                code, err = e.code, None
+            except Exception as e:  # noqa: BLE001 - timeout / refused = down
+                code, err = None, "timeout" if "timed out" in str(e) else type(e).__name__
+            return svc, {"path": path, "status": code, "ms": round((time.time() - t0) * 1000), "error": err,
+                         "ok": code is not None and code < 500 and err is None}
+        with ThreadPoolExecutor(max_workers=len(PROBES)) as pool:
+            return dict(pool.map(one, PROBES.items()))
 
     def _toxics(self) -> Dict[str, Any]:
         try:
@@ -148,6 +189,8 @@ class LiveMonitor:
 
     def _build(self, now: float) -> Dict[str, Any]:
         loc, intents, toxics, cont = self._locust(), self._intents(), self._toxics(), self._containers()
+        safety = self._safety()
+        probes = self._probes()
         thresholds = _load_thresholds()
         window = None
         if loc["ok"]:
@@ -165,6 +208,8 @@ class LiveMonitor:
             self.history.append({"ts": round(now, 1), **{k: window[k] for k in ("err", "rps", "p95_ms", "req")}})
 
         tripped = self._breaches >= thresholds["consecutive_breach_windows"]
+        if safety["ok"] and safety.get("state") == "TRIPPED":
+            tripped = True
         down = sorted(s for s, v in cont.get("services", {}).items() if not v["up"])
         recent_trip = self._last_trip_at is not None and now - self._last_trip_at < 60
         if intents["active"]:
@@ -186,17 +231,39 @@ class LiveMonitor:
         for s in SERVICES:
             c = cont.get("services", {}).get(s)
             ep = (window or {}).get("services", {}).get(s)
+            pr = probes.get(s)
+            web_pr = probes.get("web")
+            # every probe goes through the shop's gateway (web): while web itself is down/restarting, the other
+            # services' probes fail too, but that is web's outage, not theirs (unless their own container stopped)
+            gateway_down = s != "web" and bool(web_pr and not web_pr["ok"])
+            probe_down = bool(pr and not pr["ok"]) and not gateway_down
+            down_now = bool(probe_down or (c and not c["up"]))
+            out = self.outages.get(s)
+            if down_now:
+                if not out or out.get("end") is not None:
+                    out = self.outages[s] = {"start": round(now, 1), "end": None, "probe": pr,
+                                             "container": c and c["status"]}
+                elif pr and not pr["ok"]:
+                    out["probe"] = pr           # keep the latest failing answer while it is down
+                if c and not c["up"]:
+                    out["container"] = c["status"]
+            elif out and out.get("end") is None:
+                out["end"] = round(now, 1)
             services[s] = {
                 "container": c,
                 "live_error_rate": ep["err"] if ep else None,
                 "live_requests": ep["req"] if ep else None,
-                "failing": bool((c and not c["up"]) or (ep and ep["req"] and ep["err"] > 0.05)),
+                "probe": pr,
+                "last_outage": dict(self.outages[s]) if s in self.outages else None,
+                "gateway_down": gateway_down,
+                "failing": bool((c and not c["up"]) or (ep and ep["req"] and ep["err"] > 0.05) or probe_down),
             }
         return {
             "ts": round(now, 1),
             "status": status,
             "window": window and {k: window[k] for k in ("err", "req", "fail", "rps", "p95_ms", "seconds")},
-            "kill_switch": {"breach_windows": self._breaches, "tripped": tripped, **thresholds},
+            "kill_switch": {"breach_windows": self._breaches, "tripped": tripped, **thresholds,
+                            "controller": safety if safety["ok"] else None},
             "services": services,
             "edges": EDGES,
             "tiers": TIERS,

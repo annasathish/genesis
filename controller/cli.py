@@ -22,8 +22,12 @@ app = typer.Typer(
 )
 console = Console()
 
+@app.callback()
+def callback():
+    """Genesis Chaos Platform - M5 Reporting CLI"""
+    pass
 
-@app.command()
+@app.command(name="report")
 def report(
     llm: bool = typer.Option(
         False,
@@ -45,15 +49,15 @@ def report(
     Generate the resilience report from the SQLite experiment journal.
 
     Reads ExperimentIntent, ExperimentResult, and MetricsSnapshot tables
-    directly — the FastAPI controller does NOT need to be running.
+    directly - the FastAPI controller does NOT need to be running.
     """
-    console.print("\n[bold cyan]🧪 Genesis — Generating Resilience Report[/bold cyan]\n")
+    console.print("\n[bold cyan]Genesis - Generating Resilience Report[/bold cyan]\n")
 
     if llm:
         import os
         if not os.environ.get("GEMINI_API_KEY"):
             console.print(
-                "[bold red]⚠  GEMINI_API_KEY not set. "
+                "[bold red]WARNING: GEMINI_API_KEY not set. "
                 "Falling back to heuristic analysis.[/bold red]\n"
             )
             llm = False
@@ -79,15 +83,31 @@ def report(
         wtable.add_column("Fault", style="yellow")
         wtable.add_column("Score", style="red")
         wtable.add_column("Criticality")
+        wtable.add_column("Recommended Fix", style="bold green")
 
         for i, w in enumerate(data["weaknesses"], 1):
             wtable.add_row(
                 str(i), w["service"], w["fault_type"],
                 f"{w['score']}/10", w["criticality"],
+                w.get("recommended_fix") or "N/A",
             )
         console.print(wtable)
 
-    console.print(f"\n[green]✅ report.json and REPORT.md written to {out}/[/green]\n")
+    # Analysis and Recommended Fixes
+    if data["experiments"]:
+        atable = Table(title="Analysis & Recommended Fixes", show_lines=True)
+        atable.add_column("Experiment", style="bold cyan")
+        atable.add_column("Recommended Fix", style="bold green")
+        atable.add_column("Analysis", style="white")
+
+        for exp in data["experiments"]:
+            target_str = f"#{exp['intent_id']} {exp['target_service']}\n({exp['fault_type']})"
+            fix = exp.get("recommended_fix") or "N/A"
+            analysis_text = exp.get("llm_analysis") or exp.get("analysis") or "N/A"
+            atable.add_row(target_str, fix, analysis_text)
+        console.print(atable)
+
+    console.print(f"\n[green]SUCCESS: report.json and REPORT.md written to {out}/[/green]\n")
 
 
 if __name__ == "__main__":

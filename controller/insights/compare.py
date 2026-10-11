@@ -29,6 +29,8 @@ KPIS = {
     "fault_error_rate": ("down", "ratio"),
     "failed_requests": ("down", "count"),
     "checkout_loss_min": ("down", "min"),
+    "checkout_peak_loss": ("down", "ratio"),
+    "slowest_endpoint_ms": ("down", "ms"),
     "time_to_detect_s": ("down", "s"),
     "time_to_recover_s": ("down", "s"),
     "blast_radius_endpoints": ("down", "count"),
@@ -48,7 +50,8 @@ def two_proportion_z(f1: int, n1: int, f2: int, n2: int) -> Dict[str, Optional[f
     if se == 0:
         return {"z": 0.0, "p_value": 1.0}
     z = (p1 - p2) / se
-    return {"z": round(z, 3), "p_value": round(math.erfc(abs(z) / math.sqrt(2)), 6)}
+    p = math.erfc(abs(z) / math.sqrt(2))
+    return {"z": round(z, 3), "p_value": float(f"{p:.3g}")}  # 3 significant figures: tiny p stays non-zero
 
 
 def kpi_delta(name: str, old: Any, new: Any, window_s: float = 5.0) -> Dict[str, Any]:
@@ -75,6 +78,8 @@ def compare_pair(a: Dict[str, Any], b: Dict[str, Any], window_s: float = 5.0) ->
     sig = two_proportion_z(a["fault_failures"], a["fault_requests"], b["fault_failures"], b["fault_requests"])
     primary = deltas[PRIMARY]
     effect = primary["relative_change"]
+    if effect is None and primary["old"] == 0 and primary["new"] is not None:
+        effect = -1.0 if primary["new"] > 0 else 0.0   # from zero errors to some errors is a regression, not "n/a"
     significant = sig["p_value"] is not None and sig["p_value"] < ALPHA
     err_better = b["fault_error_rate"] < a["fault_error_rate"]
     if effect is None or not significant or abs(effect) < MIN_EFFECT:
@@ -96,6 +101,52 @@ def compare_pair(a: Dict[str, Any], b: Dict[str, Any], window_s: float = 5.0) ->
     }
 
 
+BASELINE_PHASE = "baseline (no change)"
+REVERTED_PHASE = "fix removed (back to baseline)"
+
+
+def phase_of(label: str) -> str:
+    """Runs labelled "fix: ..." mark a change to the system; every other run is the unchanged baseline."""
+    lab = (label or "").strip()
+    return lab if lab.lower().startswith("fix") else BASELINE_PHASE
+
+
+def _pooled(ms: List[Dict[str, Any]], phase: str) -> Dict[str, Any]:
+    """One pseudo-run per phase: KPI means, summed fault-phase counts (for the z-test)."""
+    def avg(k):
+        vals = [m[k] for m in ms if m.get(k) is not None]
+        return round(sum(vals) / len(vals), 4) if vals else None
+    em = [m["error_minutes"] for m in ms]
+    return {"run_id": f"{phase} ({len(ms)} run{'s' if len(ms) > 1 else ''})", "label": phase, "phase": phase,
+            "runs": [m["run_id"] for m in ms], "n_runs": len(ms),
+            "fault_failures": sum(m["fault_failures"] for m in ms), "fault_requests": sum(m["fault_requests"] for m in ms),
+            "noise_band": {"min": min(em), "max": max(em)} if len(ms) > 1 else None,
+            **{k: avg(k) for k in KPIS}}
+
+
+def fix_effects(ms: List[Dict[str, Any]], window_s: float = 5.0) -> Dict[str, Any]:
+    """Consecutive phases (baseline, fix A, fix B ...) compared with all their runs pooled."""
+    segs: List[List[Dict[str, Any]]] = []
+    for m in ms:
+        if segs and phase_of(segs[-1][-1]["label"]) == phase_of(m["label"]):
+            segs[-1].append(m)
+        else:
+            segs.append([m])
+    phases = []
+    for i, seg in enumerate(segs):
+        name = phase_of(seg[0]["label"])
+        if name == BASELINE_PHASE and i > 0:
+            name = REVERTED_PHASE   # back to no change after a fix: "fix removed", not a second baseline
+        phases.append(_pooled(seg, name))
+    effects = []
+    for a, b in zip(phases, phases[1:]):
+        c = compare_pair(a, b, window_s)
+        effects.append({**c, "from_phase": a["phase"], "to_phase": b["phase"],
+                        "from_runs": a["n_runs"], "to_runs": b["n_runs"]})
+    run_phase = {m["run_id"]: ph["phase"] for seg, ph in zip(segs, phases) for m in seg}
+    return {"phases": phases, "effects": effects, "run_phase": run_phase}
+
+
 def compare_runs(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
     metrics = [run_metrics(r) for r in runs]
     window_by_id = {r["run_id"]: r["window_s"] for r in runs}
@@ -114,8 +165,9 @@ def compare_runs(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
             "runs": [m["run_id"] for m in ms],
             "steps": steps,
             "cumulative": cumulative,
-            "trend": [{"run_id": m["run_id"], "label": m["label"], "started_at": m["started_at"],
-                       **{k: m.get(k) for k in KPIS}} for m in ms],
+            **(fx := fix_effects(ms, window_by_id[ms[-1]["run_id"]])),
+            "trend": [{"run_id": m["run_id"], "label": m["label"], "phase": fx["run_phase"][m["run_id"]],
+                       "started_at": m["started_at"], **{k: m.get(k) for k in KPIS}} for m in ms],
         })
     return {"metrics": metrics, "groups": out, "method": METHOD}
 
@@ -132,4 +184,7 @@ METHOD = {
                     "direction as the error rate; if they disagree the step is 'mixed'.",
     "resolution": "Detect/recover times are sampled every 5 s; differences under one window are not claimed.",
     "attribution": "Label each run (--label) with the change made before it, so every step names its cause.",
+    "fix_effect": "Runs labelled 'fix: ...' start a new phase. Each phase is compared with the one before it with all "
+                  "runs pooled (mean KPIs, summed failures/requests for the z-test), so one noisy run cannot fake or "
+                  "hide an improvement. Repeated runs with no change show the run-to-run noise band.",
 }

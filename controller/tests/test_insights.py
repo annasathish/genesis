@@ -326,9 +326,13 @@ def test_dashboard_api(tmp_path):
         def _locust(self): return {"ok": False, "error": "URLError"}
         def _intents(self): return {"ok": False, "error": "URLError", "active": []}
         def _toxics(self): return {"ok": False, "error": "URLError", "active": []}
+        def _safety(self): return {"ok": False, "error": "x"}
+        def _probes(self): return {}
     dead = DeadMonitor(docker_cmd=("definitely-not-docker",))
     c = TestClient(create_app(runs_dir=tmp_path, api_key="", monitor=dead))
-    assert c.get("/api/health").json() == {"status": "ok", "llm": False, "model": None}
+    h = c.get("/api/health").json()
+    assert {k: h[k] for k in ("status", "llm", "model")} == {"status": "ok", "llm": False, "model": None}
+    assert h["usage"]["calls"] == 0
     ov = c.get("/api/overview").json()
     assert len(ov["metrics"]) == 2 and ov["groups"][0]["steps"][0]["verdict"] == "improved"
     biz = c.post("/api/business", json={"orders_per_minute": 1000}).json()
@@ -357,6 +361,8 @@ def test_live_window_math_and_kill_switch(monkeypatch):
     monkeypatch.setattr(mon, "_locust", lambda: {"ok": True, "rows": next(samples), "rps": 20, "p95_ms": 50, "users": 10})
     monkeypatch.setattr(mon, "_intents", lambda: {"ok": True, "active": [{"id": 1, "fault": "container_crash", "target": "cart"}]})
     monkeypatch.setattr(mon, "_toxics", lambda: {"ok": True, "active": []})
+    monkeypatch.setattr(mon, "_safety", lambda: {"ok": False, "error": "x"})
+    monkeypatch.setattr(mon, "_probes", lambda: {})
     monkeypatch.setattr(live, "_load_thresholds", lambda: {"max_error_rate": 0.05, "p95_latency_threshold_ms": 165.0,
                                                            "consecutive_breach_windows": 2, "source": "test"})
     first = mon.sample(force=True)
@@ -378,12 +384,18 @@ def test_callers_of_is_transitive():
 
 
 def test_vulnerability_scoreboard():
+    from insights.severity import severity
     ms = [metrics.run_metrics(make_run("a", 100, windows=6)), metrics.run_metrics(make_run("b", 50, windows=6))]
+    ms.append(metrics.run_metrics(make_run("c", 0, windows=6, label="fix: 2 replicas")))      # fix runs don't count
+    ms.append(metrics.run_metrics(make_run("d", 80, windows=6, fault="network_latency", target="catalogue_to_mongodb")))
     sb = vulnerability.scoreboard(ms, {"services": {"redis": {"failing": True}}})
     top = sb["rows"][0]
-    assert top["service"] == "catalogue" and top["runs"] == 2
-    exp = 100 * (0.4 * 0.75 + 0.3 * mean_recovery(ms) + 0.3 * (1 / 7))
-    assert top["score"] == pytest.approx(exp, abs=0.1)
+    assert top["service"] == "catalogue" and top["runs"] == 4
+    # one entry per experiment, the latency on the catalogue_to_mongodb edge counts for catalogue
+    assert {e["id"] for e in top["experiments"]} == {"container_crash:catalogue", "network_latency:catalogue_to_mongodb"}
+    crash = next(e for e in top["experiments"] if e["fault"] == "container_crash")
+    assert crash["score"] == severity(ms[1])["severity_score"] and crash["fix_runs"] == 1   # latest run without a fix
+    assert top["score"] == max(e["score"] for e in top["experiments"])                       # worst experiment
     redis = next(r for r in sb["rows"] if r["service"] == "redis")
     assert redis["score"] is None and redis["status"] == "UNTESTED" and redis["live_failing"]
     assert "cart" in redis["cascade"] and redis["cascade_source"].startswith("predicted")
@@ -409,6 +421,7 @@ def test_env_file_last_nonempty_key_wins(tmp_path, monkeypatch):
     env.write_text("\ufeff# template\nGEMINI_API_KEY=\nUSE_LLM=true\n\nGEMINI_API_KEY=\"AQ.realkey\"\n", encoding="utf-8")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(llm, "ENV_FILE", env)
+    monkeypatch.setattr(llm, "ROOT_ENV_FILE", tmp_path / "missing-root.env")  # never read the real .env in tests
     assert llm.api_key() == "AQ.realkey"
     env.write_text("GEMINI_API_KEY=\n", encoding="utf-8")
     assert llm.api_key() == ""
@@ -451,8 +464,50 @@ def test_hanging_model_falls_through_to_next_and_is_remembered(monkeypatch):
     assert tried == ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash"]
     assert llm.configured_model() == "gemini-3.5-flash"   # next call goes straight to the working model
     calls.clear()
-    llm.generate("s", [], key="k")
+    llm.generate("s2", [], key="k")   # a different prompt (the same one is answered from the cache)
     assert [u for u in calls if ":generateContent" in u][0].endswith("gemini-3.5-flash:generateContent")
+
+
+def test_llm_cache_budget_and_quota_pause_protect_the_key(monkeypatch):
+    import io
+    monkeypatch.setattr(llm, "_working_model", None)
+    monkeypatch.delenv("CHAT_MODEL", raising=False)
+    posts = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def ok(req, timeout):
+        posts.append(req.full_url)
+        return Resp(json.dumps({"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}).encode())
+    monkeypatch.setattr(llm.urllib.request, "urlopen", ok)
+    msg = [{"role": "user", "parts": [{"text": "same question"}]}]
+    assert llm.generate("s", msg, key="k")["text"] == "OK"
+    assert llm.generate("s", msg, key="k")["text"] == "OK"
+    assert len(posts) == 1                                   # second identical question: cache, no call
+    assert llm.usage()["calls"] == 1 and llm.usage()["cache_hits"] == 1
+
+    monkeypatch.setenv("LLM_DAILY_BUDGET", "1")             # budget used up: no call, readable reason
+    with pytest.raises(llm.LLMError, match="daily AI budget"):
+        llm.generate("s", [{"role": "user", "parts": [{"text": "new"}]}], key="k")
+    assert len(posts) == 1
+
+    monkeypatch.setenv("LLM_DAILY_BUDGET", "50")
+    def quota(req, timeout):
+        posts.append(req.full_url)
+        if req.full_url.endswith("pageSize=200"):
+            return Resp(json.dumps({"models": [{"name": "models/gemini-3.5-flash", "supportedGenerationMethods": ["generateContent"]}]}).encode())
+        raise llm.urllib.error.HTTPError(req.full_url, 429, "q", {}, io.BytesIO(b'{"error":{"message":"You exceeded your current quota"}}'))
+    monkeypatch.setattr(llm.urllib.request, "urlopen", quota)
+    with pytest.raises(llm.LLMError, match="quota"):
+        llm.generate("s", [{"role": "user", "parts": [{"text": "q1"}]}], key="k")
+    assert len([u for u in posts if ":generateContent" in u]) <= 3   # gives up after two models
+    assert llm.usage()["paused_until"]
+    n = len(posts)
+    with pytest.raises(llm.LLMError, match="paused"):          # paused: not even one call
+        llm.generate("s", [{"role": "user", "parts": [{"text": "q2"}]}], key="k")
+    assert len(posts) == n
 
 
 def test_network_down_is_fatal_not_retried(monkeypatch):
@@ -485,3 +540,48 @@ def test_quota_exhausted_moves_to_next_model(monkeypatch):
         return Resp(json.dumps({"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}).encode())
     monkeypatch.setattr(llm.urllib.request, "urlopen", fake)
     assert llm.generate("s", [], key="k")["model"] == "gemini-3.5-flash"
+
+
+def test_controller_kill_switch_state_is_used(monkeypatch):
+    mon = live.LiveMonitor(docker_cmd=("definitely-not-docker",))
+    monkeypatch.setattr(mon, "_locust", lambda: {"ok": False, "error": "x"})
+    monkeypatch.setattr(mon, "_intents", lambda: {"ok": True, "active": []})
+    monkeypatch.setattr(mon, "_toxics", lambda: {"ok": True, "active": []})
+    monkeypatch.setattr(mon, "_probes", lambda: {"catalogue": {"path": "/api/catalogue/health", "status": 502,
+                                                               "ms": 4, "error": None, "ok": False}})
+    monkeypatch.setattr(mon, "_safety", lambda: {"ok": True, "state": "TRIPPED", "reason": "ERROR_RATE_BREACH",
+                                                 "is_safe_to_inject": False, "safety_reason": "wait"})
+    snap = mon.sample(force=True)
+    assert snap["kill_switch"]["tripped"] and snap["kill_switch"]["controller"]["state"] == "TRIPPED"
+    cat = snap["services"]["catalogue"]
+    assert cat["probe"]["status"] == 502 and cat["failing"]        # a 5xx from the shop gateway = service down
+
+
+def test_outage_is_remembered_after_recovery(monkeypatch):
+    mon = live.LiveMonitor(docker_cmd=("definitely-not-docker",))
+    for name, val in [("_locust", {"ok": False, "error": "x"}), ("_intents", {"ok": True, "active": []}),
+                      ("_toxics", {"ok": True, "active": []}), ("_safety", {"ok": False, "error": "x"})]:
+        monkeypatch.setattr(mon, name, lambda v=val: v)
+    down = {"catalogue": {"path": "/api/catalogue/health", "status": None, "error": "timeout", "ms": 2000, "ok": False}}
+    up = {"catalogue": {"path": "/api/catalogue/health", "status": 200, "error": None, "ms": 4, "ok": True}}
+    monkeypatch.setattr(mon, "_probes", lambda: down)
+    first = mon.sample(force=True)["services"]["catalogue"]["last_outage"]
+    assert first["end"] is None and first["probe"]["error"] == "timeout"
+    monkeypatch.setattr(mon, "_probes", lambda: up)
+    after = mon.sample(force=True)["services"]["catalogue"]
+    assert after["failing"] is False                                   # healthy again...
+    assert after["last_outage"]["end"] >= after["last_outage"]["start"]  # ...but the outage is still on record
+    assert after["last_outage"]["probe"]["error"] == "timeout"
+
+
+def test_gateway_outage_is_not_blamed_on_other_services(monkeypatch):
+    mon = live.LiveMonitor(docker_cmd=("definitely-not-docker",))
+    for name, val in [("_locust", {"ok": False, "error": "x"}), ("_intents", {"ok": True, "active": []}),
+                      ("_toxics", {"ok": True, "active": []}), ("_safety", {"ok": False, "error": "x"})]:
+        monkeypatch.setattr(mon, name, lambda v=val: v)
+    gone = {"path": "/", "status": None, "error": "RemoteDisconnected", "ms": 3, "ok": False}
+    monkeypatch.setattr(mon, "_probes", lambda: {"web": gone, "cart": {**gone, "path": "/api/cart/health"}})
+    snap = mon.sample(force=True)["services"]
+    assert snap["web"]["failing"] and snap["web"]["last_outage"]                  # web's outage is recorded
+    assert snap["cart"]["gateway_down"] and not snap["cart"]["failing"]           # cart is not blamed
+    assert snap["cart"]["last_outage"] is None

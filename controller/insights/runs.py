@@ -44,16 +44,22 @@ def normalise(raw: Dict[str, Any], run_id: str, started_at: str) -> Dict[str, An
             "failing": w.get("failing", []),
             "down": w.get("down", []),
             "ep": w.get("ep"),  # v2 only: {endpoint: [requests, failures]}
+            "lat": w.get("lat") or {},  # v3: {endpoint: mean response ms in this window}
         })
     baseline = raw.get("baseline", {}) or {}
     params = raw.get("params") or {}
+    target = raw.get("target", "unknown")
+    # network faults target a Toxiproxy edge "<caller>_to_<dependency>": the impacted service is the caller
+    service, _, dependency = target.partition("_to_")
     return {
         "run_id": run_id,
         "started_at": started_at,
         "format": "v2" if any(w["ep"] for w in windows) else "v1",
         "label": raw.get("label") or "",
         "fault": raw.get("fault", "unknown"),
-        "target": raw.get("target", "unknown"),
+        "target": target,
+        "service": service if dependency else target,
+        "edge": {"caller": service, "dependency": dependency} if dependency else None,
         "params": params,
         "signature": f"{raw.get('fault', 'unknown')}:{raw.get('target', 'unknown')}"
                      + (f":{json.dumps(params, sort_keys=True)}" if params else ""),
@@ -66,6 +72,8 @@ def normalise(raw: Dict[str, Any], run_id: str, started_at: str) -> Dict[str, An
             "threshold": float(baseline.get("threshold") or 0.05),
             "duration_s": float(baseline.get("duration_s") or 0.0) or None,
             "ep": baseline.get("ep"),  # v2 only
+            "lat": baseline.get("lat") or {},
+            "p95_limit_ms": baseline.get("p95_limit_ms"),
         },
         "windows": windows,
         "summary": raw.get("summary", {}) or {},
