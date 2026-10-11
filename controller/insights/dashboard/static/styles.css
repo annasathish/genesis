@@ -366,3 +366,12 @@ button.arming { background: var(--warning); color: #000; animation: blink 1s inf
 .lg.fault::before { border-color: var(--critical); background: var(--phase-fault); } .lg.risk::before { border-color: var(--serious); }
 .lg.rec::before { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 30%, transparent); }
 .lg.ok2::before { border-color: var(--good); background: color-mix(in srgb, var(--good) 30%, transparent); }
+
+/* ---------------------------------------------------------------- data quality */
+.dq-dims { display: flex; align-items: center; }
+.dq-dim { width: 100%; }
+.dq-type { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+.dq-type.null { border-color: var(--warning); } .dq-type.duplicate { border-color: var(--s1); }
+.dq-type.inconsistency { border-color: var(--serious); } .dq-type.discrepancy { border-color: var(--critical); }
+#dq-table tr.dq-review td { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+#dq-table code { white-space: pre; }

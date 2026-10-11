@@ -126,6 +126,20 @@ Manual mode (pick one experiment yourself) is still there under **Advanced** on 
 
 If any row fails, see *If something goes wrong* below.
 
+## 4c. Data quality (customer-entered data)
+
+Dashboard → **Data quality** tab:
+
+1. **1 · Simulate messy customer input**: registers demo customers (`dq-…`) and orders through the shop's real
+   register and order endpoints: a duplicate customer, blank and null emails, stray spaces and capitals, an email
+   typo, an order submitted twice, wrong prices and totals, a missing quantity. The shop accepts all of it.
+2. **2 · Scan**: the banner shows the problems found (16 in 15 records, quality score 40 %); the table lists each
+   one with type, record, field, before value, proposed after value and rule.
+3. **3 · Fix** (click twice): safe fixes are applied (backup first), then it re-scans: quality score 40 % → 69.2 %,
+   0 auto-fixable problems left, 4 flagged *needs review* (missing or unrepairable email, unknown quantity: no
+   safe guess). The chart and the table show before vs after.
+4. **Reset demo data** removes the `dq-…` records. The seeded accounts (`user`, `stan`, `partner-57`) are never changed.
+
 ## 5. Same thing from cmd (optional)
 
 The autonomous campaign without the browser (Ctrl+C = emergency stop):

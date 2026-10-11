@@ -1027,6 +1027,85 @@ async function loadUsage() {
   } catch {}
 }
 
+/* ================================================================== DATA QUALITY */
+const DQ_TYPES = [["null", "Null / missing"], ["duplicate", "Duplicate"], ["inconsistency", "Inconsistent / invalid"], ["discrepancy", "Discrepancy"]];
+const dqVal = (v) => v === null || v === undefined ? '<span class="muted">null</span>' : `<code>${esc(String(v))}</code>`;
+function renderDQ(d) {
+  state.dq = d;
+  const b = d && d.before && d.before.summary, a = d && d.after && d.after.summary;
+  const ban = $("dq-banner");
+  if (!b) {
+    ban.dataset.level = "unknown"; $("dq-icon").textContent = "🧹";
+    $("dq-title").textContent = "Customer data quality";
+    $("dq-sub").textContent = "Press Scan to check the shop's customer and order data, or simulate messy customer input first.";
+    $("dq-tiles").innerHTML = ""; $("dq-dims").innerHTML = ""; $("dq-table").innerHTML = ""; $("dq-when").textContent = "";
+    if (state.charts["dq-chart"]) { state.charts["dq-chart"].destroy(); delete state.charts["dq-chart"]; }
+    return;
+  }
+  const res = d.residual || {};
+  if (a) {
+    ban.dataset.level = res.open_fixable ? "bad" : "good"; $("dq-icon").textContent = res.open_fixable ? "⚠️" : "✅";
+    $("dq-title").textContent = `Fixed: quality score ${b.quality_score}% → ${a.quality_score}%`;
+    $("dq-sub").textContent = `${b.issues - a.issues} of ${b.issues} problems resolved with ${d.writes} database change(s)` +
+      (a.quarantined ? `; ${a.quarantined} flagged for a human (no safe automatic fix).` : ".") + (d.backup ? ` Backup: ${d.backup}.` : "");
+  } else {
+    ban.dataset.level = b.issues ? "warn" : "good"; $("dq-icon").textContent = b.issues ? "🔍" : "✅";
+    $("dq-title").textContent = b.issues ? `${b.issues} data problems in ${b.records} records (quality score ${b.quality_score}%)` : `All ${b.records} records are clean`;
+    $("dq-sub").textContent = b.issues ? `${b.fixable} can be fixed automatically, ${b.quarantined} need a human. Press Fix to apply.` : "Nothing to fix.";
+  }
+  $("dq-tiles").innerHTML = [
+    ["Records scanned", b.records, `${b.customers} customers · ${b.orders} orders`],
+    ["Problems found", b.issues, `${b.duplicates_merged} duplicate customer(s)`, b.issues ? "alert" : ""],
+    ["Quality score", a ? `${b.quality_score}% → ${a.quality_score}%` : `${b.quality_score}%`, "share of records with no problem", a ? "" : (b.issues ? "warn" : "")],
+    ["Fixed automatically", a ? b.issues - a.issues : b.fixable, a ? "applied" : "can be fixed"],
+    ["Flagged for review", (a || b).quarantined, "needs a human (no safe guess)", (a || b).quarantined ? "warn" : ""],
+  ].map(tile).join("");
+  $("dq-when").textContent = (d.fixed_at ? "fixed " + new Date(d.fixed_at * 1000).toLocaleTimeString() : d.scanned_at ? "scanned " + new Date(d.scanned_at * 1000).toLocaleTimeString() : "");
+  $("dq-dims").innerHTML = '<table class="dq-dim"><tr><th>Problem type</th><th class="num">Before</th><th class="num">After</th></tr>' +
+    DQ_TYPES.map(([k, l]) => `<tr><td>${l}</td><td class="num"><b>${b.by_type[k]}</b></td><td class="num ${a ? (a.by_type[k] < b.by_type[k] ? "better" : "") : "muted"}">${a ? `<b>${a.by_type[k]}</b>` : "–"}</td></tr>`).join("") +
+    `<tr><td><b>Total</b></td><td class="num"><b>${b.issues}</b></td><td class="num">${a ? `<b>${a.issues}</b>` : "–"}</td></tr></table>`;
+  const ds = [bar("Before", DQ_TYPES.map(([k]) => b.by_type[k]), css("--s2"))];
+  if (a) ds.push(bar("After fix", DQ_TYPES.map(([k]) => a.by_type[k]), css("--s3")));
+  const o = baseOptions((v) => num(v, 0), "Problems by type");
+  draw("dq-chart", { type: "bar", data: { labels: DQ_TYPES.map(([, l]) => l), datasets: ds }, options: o });
+  renderDQTable();
+}
+function renderDQTable() {
+  const d = state.dq; if (!d || !d.before) return;
+  const only = $("dq-only-open").checked;
+  const rows = d.before.issues.filter((i) => !only || !i.fixable);
+  $("dq-table").innerHTML = `<tr><th>Type</th><th>Record</th><th>Field</th><th>Before</th><th>After</th><th>Action</th></tr>` +
+    (rows.length ? rows.map((i) => `<tr class="${i.fixable ? "" : "dq-review"}"><td><span class="dq-type ${i.type}">${esc(i.type_label)}</span></td>
+      <td>${esc(i.record)}</td><td><code>${esc(i.field)}</code></td><td>${dqVal(i.before)}</td>
+      <td>${i.fixable ? dqVal(i.after) : '<span class="muted">unchanged</span>'}</td>
+      <td>${i.fixable ? (d.after ? "✅ " : "") : "🚩 "}${esc(i.action)}<div class="hint">${esc(i.rule)}</div></td></tr>`).join("")
+      : '<tr><td colspan="6" class="muted">No problems.</td></tr>');
+}
+async function dqAction(kind) {
+  const btn = $("dq-" + kind);
+  if (kind === "fix" && !armed(btn, "Click again to apply the fixes")) return;
+  const label = btn.dataset.label || btn.textContent;
+  document.querySelectorAll("[id^=dq-]").forEach((b) => { if (b.tagName === "BUTTON") b.disabled = true; });
+  btn.textContent = { inject: "Entering messy data…", scan: "Scanning…", fix: "Fixing…", reset: "Resetting…" }[kind];
+  try {
+    const r = await fetch("/api/data/" + kind, { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || "HTTP " + r.status);
+    if (kind === "reset") { renderDQ({}); toast("🧹", `Demo data removed (${d.removed.customers} customers, ${d.removed.orders} order histories)`, "good"); $("dq-note").textContent = ""; }
+    else {
+      renderDQ(d);
+      if (kind === "inject") { $("dq-note").textContent = `Entered ${d.injected.accepted} demo records through the shop's real API (register + order), all accepted by the shop.`; toast("🧪", "Messy customer data entered", "warn"); }
+      if (kind === "scan") toast("🔍", `${d.before.summary.issues} problems found`, d.before.summary.issues ? "warn" : "good");
+      if (kind === "fix") toast("✅", `Fixed: ${d.before.summary.quality_score}% → ${d.after.summary.quality_score}% quality`, "good");
+    }
+  } catch (e) { toast("⛔", "Data quality: " + e.message, "bad"); }
+  finally {
+    document.querySelectorAll("[id^=dq-]").forEach((b) => { if (b.tagName === "BUTTON") b.disabled = false; });
+    btn.textContent = label;
+  }
+}
+async function loadDQ() { try { renderDQ(await api("/api/data/last")); } catch { renderDQ({}); } }
+
 /* ================================================================== WIRING */
 function setTab(t) {
   state.tab = t;
@@ -1036,6 +1115,7 @@ function setTab(t) {
   Object.values(state.charts).forEach((c) => c.resize());
   if (t === "business" && state.data && !state.briefFor) loadBrief();
   if (t === "report" && !state.reportLoaded) { state.reportLoaded = true; loadReportTab(); }
+  if (t === "data" && !state.dqLoaded) { state.dqLoaded = true; loadDQ(); }
 }
 function init() {
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
@@ -1058,6 +1138,8 @@ function init() {
   $("ctl-run").addEventListener("click", runExperiment);
   $("ctl-stop").addEventListener("click", emergencyStop);
   $("ap-start").addEventListener("click", startAutopilot);
+  ["inject", "scan", "fix", "reset"].forEach((k) => $("dq-" + k).addEventListener("click", () => dqAction(k)));
+  $("dq-only-open").addEventListener("change", renderDQTable);
   $("ctl-approve").addEventListener("change", loadControl);
   $("ctl-pick").addEventListener("change", loadControl);
   $("theme").addEventListener("click", () => {
@@ -1076,7 +1158,7 @@ function init() {
   }).catch(() => {});
   addMsg("bot", "Hi! Ask me what is happening right now, how a run went, whether we improved, what it costs the business, or what to fix first.");
   state.chatReady = true;
-  const fromHash = () => { const t = (location.hash || "").slice(1); return ["live", "experiments", "business", "report"].includes(t) ? t : "live"; };
+  const fromHash = () => { const t = (location.hash || "").slice(1); return ["live", "experiments", "business", "report", "data"].includes(t) ? t : "live"; };
   window.addEventListener("hashchange", () => { if (fromHash() !== state.tab) setTab(fromHash()); });
   setTab(fromHash());
   loadLive(); loadOverview();

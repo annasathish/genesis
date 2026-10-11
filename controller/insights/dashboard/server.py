@@ -67,7 +67,7 @@ class ChatIn(BaseModel):
 
 
 def create_app(runs_dir: Path = None, api_key: str = None, monitor: LiveMonitor = None,
-               runner=None) -> FastAPI:
+               runner=None, dq_source=None) -> FastAPI:
     app = FastAPI(title="Genesis Resilience Dashboard", docs_url="/api/docs")
     mon = monitor or LiveMonitor()
 
@@ -244,6 +244,83 @@ def create_app(runs_dir: Path = None, api_key: str = None, monitor: LiveMonitor 
     @app.post("/api/autopilot/stop")
     def autopilot_stop():
         return autopilot.stop()
+
+    # ---------------------------------------------------------------- data quality (customer-entered data)
+    from insights import dataquality as dq
+    from insights.dataquality_shop import DataSourceError, ShopData
+    dq_dir = Path(runs_dir or DEFAULT_RUNS_DIR) / "dataquality"
+    dq_src = dq_source or ShopData(backup_dir=dq_dir)
+    dq_lock = threading.Lock()
+
+    def dq_save(doc):
+        try:
+            dq_dir.mkdir(parents=True, exist_ok=True)
+            (dq_dir / "last.json").write_text(json.dumps(doc, default=str), encoding="utf-8")
+        except OSError:
+            pass
+
+    def dq_scan():
+        snap = dq_src.snapshot()
+        return snap, dq.analyze(snap["customers"], snap["orders"], snap["catalogue"])
+
+    def dq_guard(fn):
+        if not dq_lock.acquire(blocking=False):
+            raise HTTPException(409, "a data-quality action is already running")
+        try:
+            return fn()
+        except DataSourceError as exc:
+            raise HTTPException(503, str(exc))
+        finally:
+            dq_lock.release()
+
+    @app.get("/api/data/last")
+    def dq_last():
+        try:
+            return json.loads((dq_dir / "last.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    @app.post("/api/data/scan")
+    def dq_scan_ep():
+        def run():
+            snap, a = dq_scan()
+            doc = {"stage": "scanned", "before": dq.for_screen(a), "scanned_at": snap["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/inject")
+    def dq_inject():
+        def run():
+            injected = dq_src.inject_demo()
+            snap, a = dq_scan()
+            doc = {"stage": "scanned", "injected": injected, "before": dq.for_screen(a), "scanned_at": snap["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/fix")
+    def dq_fix():
+        def run():
+            snap, before = dq_scan()                       # always fix from a fresh snapshot, never client data
+            ops = dq.plan_writes(snap["customers"], snap["orders"], before)
+            res = dq_src.apply(ops, snap)
+            snap2, after = dq_scan()
+            doc = {"stage": "fixed", "before": dq.for_screen(before), "after": dq.for_screen(after),
+                   "residual": dq.residual_summary(after), "writes": res["applied"],
+                   "backup": Path(res["backup"]).name if res.get("backup") else None,
+                   "scanned_at": snap["taken_at"], "fixed_at": snap2["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/reset")
+    def dq_reset():
+        def run():
+            out = dq_src.reset_demo()
+            dq_save({})
+            return {"removed": out}
+        return dq_guard(run)
 
     @app.get("/")
     def index():
