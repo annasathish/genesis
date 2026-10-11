@@ -67,7 +67,7 @@ class ChatIn(BaseModel):
 
 
 def create_app(runs_dir: Path = None, api_key: str = None, monitor: LiveMonitor = None,
-               runner=None) -> FastAPI:
+               runner=None, dq_source=None, dataset_path: Path = None) -> FastAPI:
     app = FastAPI(title="Genesis Resilience Dashboard", docs_url="/api/docs")
     mon = monitor or LiveMonitor()
 
@@ -244,6 +244,144 @@ def create_app(runs_dir: Path = None, api_key: str = None, monitor: LiveMonitor 
     @app.post("/api/autopilot/stop")
     def autopilot_stop():
         return autopilot.stop()
+
+    # ---------------------------------------------------------------- data quality (customer-entered data)
+    from insights import dataquality as dq
+    from insights.dataquality_shop import DataSourceError, ShopData
+    dq_dir = Path(runs_dir or DEFAULT_RUNS_DIR) / "dataquality"
+    dq_src = dq_source or ShopData(backup_dir=dq_dir)
+    dq_lock = threading.Lock()
+
+    def dq_save(doc):
+        try:
+            dq_dir.mkdir(parents=True, exist_ok=True)
+            (dq_dir / "last.json").write_text(json.dumps(doc, default=str), encoding="utf-8")
+        except OSError:
+            pass
+
+    def dq_scan():
+        snap = dq_src.snapshot()
+        return snap, dq.analyze(snap["customers"], snap["orders"], snap["catalogue"])
+
+    def dq_guard(fn):
+        if not dq_lock.acquire(blocking=False):
+            raise HTTPException(409, "a data-quality action is already running")
+        try:
+            return fn()
+        except DataSourceError as exc:
+            raise HTTPException(503, str(exc))
+        finally:
+            dq_lock.release()
+
+    @app.get("/api/data/last")
+    def dq_last():
+        try:
+            return json.loads((dq_dir / "last.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    @app.post("/api/data/scan")
+    def dq_scan_ep():
+        def run():
+            snap, a = dq_scan()
+            doc = {"stage": "scanned", "before": dq.for_screen(a), "scanned_at": snap["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/inject")
+    def dq_inject():
+        def run():
+            injected = dq_src.inject_demo()
+            snap, a = dq_scan()
+            doc = {"stage": "scanned", "injected": injected, "before": dq.for_screen(a), "scanned_at": snap["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/fix")
+    def dq_fix():
+        def run():
+            snap, before = dq_scan()                       # always fix from a fresh snapshot, never client data
+            ops = dq.plan_writes(snap["customers"], snap["orders"], before)
+            res = dq_src.apply(ops, snap)
+            snap2, after = dq_scan()
+            doc = {"stage": "fixed", "before": dq.for_screen(before), "after": dq.for_screen(after),
+                   "residual": dq.residual_summary(after), "writes": res["applied"],
+                   "backup": Path(res["backup"]).name if res.get("backup") else None,
+                   "scanned_at": snap["taken_at"], "fixed_at": snap2["taken_at"]}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/reset")
+    def dq_reset():
+        def run():
+            out = dq_src.reset_demo()
+            dq_save({})
+            return {"removed": out}
+        return dq_guard(run)
+
+    # ---------------------------------------------------------------- data quality on a large e-commerce dataset
+    from insights import dataquality_dataset as dqd
+    import time as _time
+    dataset = Path(dataset_path) if dataset_path else Path(__file__).resolve().parents[3] / "data" / "ecommerce_orders.csv"
+    ds_files = {"raw": dataset, "truth": dataset.with_name(dataset.stem + "_truth.json"),
+                "clean": dq_dir / "ecommerce_orders_clean.csv", "issues": dq_dir / "ecommerce_orders_issues.csv"}
+
+    def ds_rows():
+        if not dataset.is_file():
+            dqd.write_dataset(dataset)
+        return dqd.read_csv(dataset)
+
+    def ds_meta(rows):
+        return {"name": dataset.name, "rows": len(rows), "synthetic": True,
+                "note": "Generated e-commerce order export (fixed seed); problems planted at known rates."}
+
+    @app.post("/api/data/dataset/scan")
+    def ds_scan():
+        def run():
+            rows = ds_rows()
+            a = dqd.analyze(rows)
+            doc = {"stage": "scanned", "source": "dataset", "dataset": ds_meta(rows),
+                   "before": {"summary": a["summary"], "issues": dqd.sample_issues(a["issues"])},
+                   "by_rule": a["by_rule"], "profile_before": dqd.profile(rows), "scanned_at": _time.time()}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.post("/api/data/dataset/fix")
+    def ds_fix():
+        def run():
+            rows = ds_rows()
+            a = dqd.analyze(rows)
+            dqd.write_csv(a["cleaned"], ds_files["clean"], dqd.COLUMNS + ["dq_status"])
+            dqd.write_csv(a["issues"], ds_files["issues"],
+                          ["row", "record", "type", "field", "rule", "before", "after", "action", "fixable"])
+            b = dqd.analyze(a["cleaned"])
+            try:
+                truth = json.loads(ds_files["truth"].read_text(encoding="utf-8"))["rows"]
+                acc = dqd.accuracy(a["flagged_rows"], truth)
+            except (OSError, ValueError, KeyError):
+                acc = None
+            open_fixable = sum(1 for k in b["issues"] if k["fixable"])
+            doc = {"stage": "fixed", "source": "dataset", "dataset": ds_meta(rows),
+                   "before": {"summary": a["summary"], "issues": dqd.sample_issues(a["issues"])},
+                   "after": {"summary": b["summary"], "issues": dqd.sample_issues(b["issues"])},
+                   "residual": {**b["summary"], "open_fixable": open_fixable},
+                   "writes": a["summary"]["rows_flagged"], "by_rule": a["by_rule"],
+                   "profile_before": dqd.profile(rows), "profile_after": dqd.profile(a["cleaned"]),
+                   "accuracy": acc, "scanned_at": _time.time(), "fixed_at": _time.time()}
+            dq_save(doc)
+            return doc
+        return dq_guard(run)
+
+    @app.get("/api/data/dataset/download/{kind}")
+    def ds_download(kind: str):
+        f = ds_files.get(kind)
+        if f is None or not f.is_file():
+            raise HTTPException(404, "not available yet: scan / fix the dataset first")
+        return FileResponse(f, filename=f.name)
 
     @app.get("/")
     def index():

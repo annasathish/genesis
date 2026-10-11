@@ -1027,6 +1027,113 @@ async function loadUsage() {
   } catch {}
 }
 
+/* ================================================================== DATA QUALITY */
+const DQ_TYPES = [["null", "Null / missing"], ["duplicate", "Duplicate"], ["inconsistency", "Inconsistent / invalid"], ["discrepancy", "Discrepancy"]];
+const dqVal = (v) => v === null || v === undefined ? '<span class="muted">null</span>' : `<code>${esc(String(v))}</code>`;
+function renderDQ(d) {
+  state.dq = d;
+  const b = d && d.before && d.before.summary, a = d && d.after && d.after.summary;
+  const ban = $("dq-banner");
+  if (!b) {
+    ban.dataset.level = "unknown"; $("dq-icon").textContent = "🧹";
+    $("dq-title").textContent = "Customer data quality";
+    $("dq-sub").textContent = "Press Scan to check the shop's customer and order data, or simulate messy customer input first.";
+    $("dq-tiles").innerHTML = ""; $("dq-dims").innerHTML = ""; $("dq-table").innerHTML = ""; $("dq-when").textContent = "";
+    if (state.charts["dq-chart"]) { state.charts["dq-chart"].destroy(); delete state.charts["dq-chart"]; }
+    return;
+  }
+  const res = d.residual || {};
+  const isDs = d.source === "dataset", acc = d.accuracy;
+  if (a && isDs) {
+    ban.dataset.level = res.open_fixable ? "bad" : "good"; $("dq-icon").textContent = res.open_fixable ? "⚠️" : "✅";
+    $("dq-title").textContent = `Fixed: quality score ${b.quality_score}% → ${a.quality_score}% on ${num(b.records, 0)} order lines`;
+    $("dq-sub").textContent = `${num(b.fixable, 0)} problems fixed automatically (${num(b.rows_removed, 0)} duplicate lines removed); ` +
+      `${num(a.rows_for_review, 0)} rows flagged for a human.` + (acc ? ` Detection vs planted problems: recall ${acc.recall}%, precision ${acc.precision}%.` : "");
+  } else if (a) {
+    ban.dataset.level = res.open_fixable ? "bad" : "good"; $("dq-icon").textContent = res.open_fixable ? "⚠️" : "✅";
+    $("dq-title").textContent = `Fixed: quality score ${b.quality_score}% → ${a.quality_score}%`;
+    $("dq-sub").textContent = `${b.issues - a.issues} of ${b.issues} problems resolved with ${d.writes} database change(s)` +
+      (a.quarantined ? `; ${a.quarantined} flagged for a human (no safe automatic fix).` : ".") + (d.backup ? ` Backup: ${d.backup}.` : "");
+  } else {
+    ban.dataset.level = b.issues ? "warn" : "good"; $("dq-icon").textContent = b.issues ? "🔍" : "✅";
+    $("dq-title").textContent = b.issues ? `${num(b.issues, 0)} data problems in ${num(b.records, 0)} ${isDs ? "order lines" : "records"} (quality score ${b.quality_score}%)` : `All ${num(b.records, 0)} records are clean`;
+    $("dq-sub").textContent = b.issues ? `${b.fixable} can be fixed automatically, ${b.quarantined} need a human. Press Fix to apply.` : "Nothing to fix.";
+  }
+  $("dq-tiles").innerHTML = [
+    [isDs ? "Order lines scanned" : "Records scanned", num(b.records, 0), `${num(b.customers, 0)} customers · ${num(b.orders, 0)} orders`],
+    ["Problems found", num(b.issues, 0), `${num(b.duplicates_merged, 0)} duplicate(s)`, b.issues ? "alert" : ""],
+    ["Quality score", a ? `${b.quality_score}% → ${a.quality_score}%` : `${b.quality_score}%`, "share of records with no problem", a ? "" : (b.issues ? "warn" : "")],
+    ["Fixed automatically", num(a ? b.issues - a.issues : b.fixable, 0), a ? "applied" : "can be fixed"],
+    ["Flagged for review", num((a || b).quarantined, 0), "needs a human (no safe guess)", (a || b).quarantined ? "warn" : ""],
+  ].concat(acc ? [["Detection accuracy", `${acc.recall}%`, `planted problems found · precision ${acc.precision}%`]] : []).map(tile).join("");
+  renderDQExtra(d);
+  $("dq-when").textContent = (d.fixed_at ? "fixed " + new Date(d.fixed_at * 1000).toLocaleTimeString() : d.scanned_at ? "scanned " + new Date(d.scanned_at * 1000).toLocaleTimeString() : "");
+  $("dq-dims").innerHTML = '<table class="dq-dim"><tr><th>Problem type</th><th class="num">Before</th><th class="num">After</th></tr>' +
+    DQ_TYPES.map(([k, l]) => `<tr><td>${l}</td><td class="num"><b>${num(b.by_type[k], 0)}</b></td><td class="num ${a ? (a.by_type[k] < b.by_type[k] ? "better" : "") : "muted"}">${a ? `<b>${num(a.by_type[k], 0)}</b>` : "–"}</td></tr>`).join("") +
+    `<tr><td><b>Total</b></td><td class="num"><b>${num(b.issues, 0)}</b></td><td class="num">${a ? `<b>${num(a.issues, 0)}</b>` : "–"}</td></tr></table>`;
+  const ds = [bar("Before", DQ_TYPES.map(([k]) => b.by_type[k]), css("--s2"))];
+  if (a) ds.push(bar("After fix", DQ_TYPES.map(([k]) => a.by_type[k]), css("--s3")));
+  const o = baseOptions((v) => num(v, 0), "Problems by type");
+  draw("dq-chart", { type: "bar", data: { labels: DQ_TYPES.map(([, l]) => l), datasets: ds }, options: o });
+  renderDQTable();
+}
+const DQ_COLS = { email: "Email", customer_id: "Customer id", customer_name: "Name", phone: "Phone", country: "Country",
+  order_date: "Order date", product_id: "Product id", quantity: "Quantity", unit_price: "Unit price", status: "Status", payment_method: "Payment" };
+function renderDQExtra(d) {
+  const box = $("dq-extra");
+  box.hidden = d.source !== "dataset";
+  if (box.hidden) return;
+  const pb = d.profile_before || {}, pa = d.profile_after;
+  $("dq-profile").innerHTML = `<tr><th>Column</th><th class="num">Blank before</th><th class="num">Blank after</th><th class="num">Spellings before</th><th class="num">after</th></tr>` +
+    Object.entries(DQ_COLS).map(([c, l]) => { const x = pb[c] || {}, y = pa ? pa[c] || {} : null;
+      return `<tr><td>${l}</td><td class="num">${num(x.blank, 0)}</td><td class="num ${y && y.blank < x.blank ? "better" : ""}">${y ? num(y.blank, 0) : "–"}</td>
+        <td class="num">${x.distinct != null ? num(x.distinct, 0) : ""}</td><td class="num ${y && y.distinct < x.distinct ? "better" : ""}">${y && y.distinct != null ? num(y.distinct, 0) : ""}</td></tr>`; }).join("");
+  $("dq-rules").innerHTML = `<tr><th>Problems by rule</th><th>Type</th><th class="num">Found</th></tr>` +
+    (d.by_rule || []).slice(0, 14).map((r) => `<tr><td>${esc(r.rule)}<div class="hint"><code>${esc(r.field)}</code></div></td><td><span class="dq-type ${r.type}">${esc(r.type_label)}</span></td><td class="num"><b>${num(r.count, 0)}</b></td></tr>`).join("");
+  $("dq-downloads").innerHTML = `<a class="dl" href="/api/data/dataset/download/raw">Raw CSV</a>` +
+    (d.after ? ` <a class="dl" href="/api/data/dataset/download/clean">Cleaned CSV</a> <a class="dl" href="/api/data/dataset/download/issues">All problems (CSV)</a>` : "");
+}
+function renderDQTable() {
+  const d = state.dq; if (!d || !d.before) return;
+  const only = $("dq-only-open").checked;
+  const rows = d.before.issues.filter((i) => !only || !i.fixable);
+  $("dq-table-note").textContent = (d.source === "dataset"
+    ? `Showing ${num(d.before.issues.length, 0)} of ${num(d.before.summary.issues, 0)} problems (a sample covering every rule; the full list is in the CSV download). `
+    : "") + "Emails are partly hidden; ␣ marks a stray space. Passwords are never read.";
+  $("dq-table").innerHTML = `<tr><th>Type</th><th>Record</th><th>Field</th><th>Before</th><th>After</th><th>Action</th></tr>` +
+    (rows.length ? rows.map((i) => `<tr class="${i.fixable ? "" : "dq-review"}"><td><span class="dq-type ${i.type}">${esc(i.type_label)}</span></td>
+      <td>${esc(i.record)}</td><td><code>${esc(i.field)}</code></td><td>${dqVal(i.before)}</td>
+      <td>${i.fixable ? dqVal(i.after) : '<span class="muted">unchanged</span>'}</td>
+      <td>${i.fixable ? (d.after ? "✅ " : "") : "🚩 "}${esc(i.action)}<div class="hint">${esc(i.rule)}</div></td></tr>`).join("")
+      : '<tr><td colspan="6" class="muted">No problems.</td></tr>');
+}
+async function dqAction(kind) {
+  const btn = $("dq-" + kind);
+  const label = btn.dataset.label || btn.textContent;
+  document.querySelectorAll("[id^=dq-]").forEach((b) => { if (b.tagName === "BUTTON") b.disabled = true; });
+  btn.textContent = { inject: "Entering messy data…", scan: "Scanning…", fix: "Fixing…", reset: "Resetting…", dscan: "Scanning 20,300 lines…", dfix: "Fixing…" }[kind];
+  try {
+    const url = { dscan: "/api/data/dataset/scan", dfix: "/api/data/dataset/fix" }[kind] || "/api/data/" + kind;
+    const r = await fetch(url, { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || "HTTP " + r.status);
+    if (kind === "reset") { renderDQ({}); toast("🧹", `Demo data removed (${d.removed.customers} customers, ${d.removed.orders} order histories)`, "good"); $("dq-note").textContent = ""; }
+    else {
+      renderDQ(d);
+      if (kind === "inject") { $("dq-note").textContent = `Entered ${d.injected.accepted} demo records through the shop's real API (register + order), all accepted by the shop.`; toast("🧪", "Messy customer data entered", "warn"); }
+      if (kind === "scan") toast("🔍", `${d.before.summary.issues} problems found`, d.before.summary.issues ? "warn" : "good");
+      if (kind === "fix" || kind === "dfix") toast("✅", `Fixed: ${d.before.summary.quality_score}% → ${d.after.summary.quality_score}% quality`, "good");
+      if (kind === "dscan") toast("🔍", `${num(d.before.summary.issues, 0)} problems in ${num(d.before.summary.records, 0)} order lines`, "warn");
+      if (kind === "dscan" || kind === "dfix") $("dq-note").textContent = d.dataset ? d.dataset.note : "";
+    }
+  } catch (e) { toast("⛔", "Data quality: " + e.message, "bad"); }
+  finally {
+    document.querySelectorAll("[id^=dq-]").forEach((b) => { if (b.tagName === "BUTTON") b.disabled = false; });
+    btn.textContent = label;
+  }
+}
+async function loadDQ() { try { renderDQ(await api("/api/data/last")); } catch { renderDQ({}); } }
+
 /* ================================================================== WIRING */
 function setTab(t) {
   state.tab = t;
@@ -1036,6 +1143,7 @@ function setTab(t) {
   Object.values(state.charts).forEach((c) => c.resize());
   if (t === "business" && state.data && !state.briefFor) loadBrief();
   if (t === "report" && !state.reportLoaded) { state.reportLoaded = true; loadReportTab(); }
+  if (t === "data" && !state.dqLoaded) { state.dqLoaded = true; loadDQ(); }
 }
 function init() {
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
@@ -1058,6 +1166,8 @@ function init() {
   $("ctl-run").addEventListener("click", runExperiment);
   $("ctl-stop").addEventListener("click", emergencyStop);
   $("ap-start").addEventListener("click", startAutopilot);
+  ["inject", "scan", "fix", "reset", "dscan", "dfix"].forEach((k) => $("dq-" + k).addEventListener("click", () => dqAction(k)));
+  $("dq-only-open").addEventListener("change", renderDQTable);
   $("ctl-approve").addEventListener("change", loadControl);
   $("ctl-pick").addEventListener("change", loadControl);
   $("theme").addEventListener("click", () => {
@@ -1076,7 +1186,7 @@ function init() {
   }).catch(() => {});
   addMsg("bot", "Hi! Ask me what is happening right now, how a run went, whether we improved, what it costs the business, or what to fix first.");
   state.chatReady = true;
-  const fromHash = () => { const t = (location.hash || "").slice(1); return ["live", "experiments", "business", "report"].includes(t) ? t : "live"; };
+  const fromHash = () => { const t = (location.hash || "").slice(1); return ["live", "experiments", "business", "report", "data"].includes(t) ? t : "live"; };
   window.addEventListener("hashchange", () => { if (fromHash() !== state.tab) setTab(fromHash()); });
   setTab(fromHash());
   loadLive(); loadOverview();
