@@ -14,6 +14,11 @@ from typing import Optional
 
 from ai_client import generate_json
 
+try:  # PII masking before anything leaves for the LLM (controller/insights/pii.py)
+    from insights.pii import Masker
+except ImportError:  # pragma: no cover - keep the analyzer usable on its own
+    Masker = None
+
 # ── Fixed Vocabulary ────────────────────────────────────────────────
 FIXED_VOCABULARY = [
     "Increase Replicas",
@@ -96,8 +101,13 @@ Respond in this exact JSON format (no markdown, no extra text):
 {{"explanation": "...", "recommended_fix": "..."}}
 """
 
+    if Masker is not None:
+        prompt = Masker().mask_text(prompt)
+
     raw = generate_json(prompt).strip().removeprefix("```json").removesuffix("```").strip()
     parsed = json.loads(raw)
+    if Masker is not None:
+        parsed["explanation"] = Masker().mask_text(parsed.get("explanation", ""))
 
     # Enforce vocabulary constraint
     fix = parsed.get("recommended_fix", "")

@@ -1,0 +1,681 @@
+{
+  "target": "catalogue",
+  "fault": "container_crash",
+  "params": {},
+  "label": "proof demo: catalogue down",
+  "window_s": 5.0,
+  "started_at": "2026-10-11T02:32:53",
+  "windows": [
+    {
+      "t": 5.2,
+      "phase": "fault",
+      "req": 195,
+      "err": 0.005128205128205128,
+      "p95": 28,
+      "failing": [
+        "cart:add"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          17,
+          1
+        ],
+        "catalogue:categories": [
+          26,
+          0
+        ],
+        "catalogue:product": [
+          26,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          8,
+          0
+        ],
+        "ratings:fetch": [
+          26,
+          0
+        ],
+        "ratings:rate": [
+          8,
+          0
+        ],
+        "shipping:calc": [
+          8,
+          0
+        ],
+        "shipping:codes": [
+          8,
+          0
+        ],
+        "shipping:confirm": [
+          8,
+          0
+        ],
+        "shipping:match": [
+          8,
+          0
+        ],
+        "user:login": [
+          7,
+          0
+        ],
+        "user:uniqueid": [
+          12,
+          0
+        ],
+        "web:index": [
+          33,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 12.0,
+        "catalogue:categories": 4.9,
+        "catalogue:product": 6.1,
+        "payment:pay": 17.8,
+        "ratings:fetch": 8.9,
+        "ratings:rate": 26.9,
+        "shipping:calc": 7.0,
+        "shipping:codes": 4.6,
+        "shipping:confirm": 6.0,
+        "shipping:match": 362.4,
+        "user:login": 7.2,
+        "user:uniqueid": 3.6,
+        "web:index": 1.8
+      },
+      "slow": [],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": null,
+        "error": "timeout",
+        "ms": 3023,
+        "ok": false
+      }
+    },
+    {
+      "t": 13.4,
+      "phase": "fault",
+      "req": 7,
+      "err": 0.42857142857142855,
+      "p95": 9900.0,
+      "failing": [
+        "cart:add"
+      ],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          3,
+          3
+        ],
+        "catalogue:categories": [
+          0,
+          0
+        ],
+        "catalogue:product": [
+          0,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          0,
+          0
+        ],
+        "ratings:fetch": [
+          0,
+          0
+        ],
+        "ratings:rate": [
+          0,
+          0
+        ],
+        "shipping:calc": [
+          0,
+          0
+        ],
+        "shipping:codes": [
+          0,
+          0
+        ],
+        "shipping:confirm": [
+          0,
+          0
+        ],
+        "shipping:match": [
+          0,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          0,
+          0
+        ],
+        "web:index": [
+          3,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 6933.7,
+        "user:login": 5.0,
+        "web:index": 1.8
+      },
+      "slow": [
+        "cart:add"
+      ],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": null,
+        "error": "timeout",
+        "ms": 3027,
+        "ok": false
+      }
+    },
+    {
+      "t": 21.6,
+      "phase": "fault",
+      "req": 0,
+      "err": 0.0,
+      "p95": 9900.0,
+      "failing": [],
+      "down": [
+        "robotshop-catalogue-1"
+      ],
+      "ep": {
+        "cart:add": [
+          0,
+          0
+        ],
+        "catalogue:categories": [
+          0,
+          0
+        ],
+        "catalogue:product": [
+          0,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          0,
+          0
+        ],
+        "ratings:fetch": [
+          0,
+          0
+        ],
+        "ratings:rate": [
+          0,
+          0
+        ],
+        "shipping:calc": [
+          0,
+          0
+        ],
+        "shipping:codes": [
+          0,
+          0
+        ],
+        "shipping:confirm": [
+          0,
+          0
+        ],
+        "shipping:match": [
+          0,
+          0
+        ],
+        "user:login": [
+          0,
+          0
+        ],
+        "user:uniqueid": [
+          0,
+          0
+        ],
+        "web:index": [
+          0,
+          0
+        ]
+      },
+      "lat": {},
+      "slow": [],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": null,
+        "error": "timeout",
+        "ms": 3028,
+        "ok": false
+      }
+    },
+    {
+      "t": 41.0,
+      "phase": "recovery",
+      "req": 154,
+      "err": 0.2532467532467532,
+      "p95": 19000.0,
+      "failing": [
+        "catalogue:categories",
+        "catalogue:product",
+        "ratings:fetch",
+        "user:login",
+        "user:uniqueid",
+        "web:index"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          0
+        ],
+        "catalogue:categories": [
+          27,
+          9
+        ],
+        "catalogue:product": [
+          27,
+          12
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          6,
+          0
+        ],
+        "ratings:fetch": [
+          27,
+          12
+        ],
+        "ratings:rate": [
+          0,
+          0
+        ],
+        "shipping:calc": [
+          6,
+          0
+        ],
+        "shipping:codes": [
+          7,
+          0
+        ],
+        "shipping:confirm": [
+          6,
+          0
+        ],
+        "shipping:match": [
+          6,
+          0
+        ],
+        "user:login": [
+          1,
+          1
+        ],
+        "user:uniqueid": [
+          10,
+          3
+        ],
+        "web:index": [
+          17,
+          2
+        ]
+      },
+      "lat": {
+        "cart:add": 11.0,
+        "catalogue:categories": 11099.5,
+        "catalogue:product": 6.9,
+        "payment:pay": 15.3,
+        "ratings:fetch": 8.0,
+        "shipping:calc": 5.2,
+        "shipping:codes": 4.2,
+        "shipping:confirm": 6.2,
+        "shipping:match": 271.1,
+        "user:login": 3.2,
+        "user:uniqueid": 3.6,
+        "web:index": 63.7
+      },
+      "slow": [
+        "catalogue:categories"
+      ],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": 200,
+        "error": null,
+        "ms": 20,
+        "ok": true
+      }
+    },
+    {
+      "t": 46.2,
+      "phase": "recovery",
+      "req": 123,
+      "err": 0.0,
+      "p95": 29,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          21,
+          0
+        ],
+        "catalogue:product": [
+          21,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          21,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          21,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 11.6,
+        "catalogue:categories": 6.3,
+        "catalogue:product": 7.2,
+        "payment:pay": 16.4,
+        "ratings:fetch": 9.7,
+        "ratings:rate": 35.9,
+        "shipping:calc": 4.1,
+        "shipping:codes": 5.3,
+        "shipping:confirm": 5.4,
+        "shipping:match": 477.8,
+        "user:login": 6.6,
+        "user:uniqueid": 4.3,
+        "web:index": 2.1
+      },
+      "slow": [],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": 200,
+        "error": null,
+        "ms": 13,
+        "ok": true
+      }
+    },
+    {
+      "t": 51.4,
+      "phase": "recovery",
+      "req": 76,
+      "err": 0.0,
+      "p95": 26,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          10,
+          0
+        ],
+        "catalogue:product": [
+          10,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          4,
+          0
+        ],
+        "ratings:fetch": [
+          10,
+          0
+        ],
+        "ratings:rate": [
+          0,
+          0
+        ],
+        "shipping:calc": [
+          4,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          4,
+          0
+        ],
+        "shipping:match": [
+          4,
+          0
+        ],
+        "user:login": [
+          4,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          10,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.9,
+        "catalogue:categories": 4.7,
+        "catalogue:product": 5.8,
+        "payment:pay": 14.8,
+        "ratings:fetch": 8.7,
+        "shipping:calc": 4.0,
+        "shipping:codes": 4.3,
+        "shipping:confirm": 4.9,
+        "shipping:match": 577.2,
+        "user:login": 6.0,
+        "user:uniqueid": 4.2,
+        "web:index": 1.8
+      },
+      "slow": [],
+      "probe": {
+        "path": "/api/catalogue/health",
+        "status": 200,
+        "error": null,
+        "ms": 15,
+        "ok": true
+      }
+    }
+  ],
+  "baseline": {
+    "requests": 588,
+    "error_rate": 0.0,
+    "p95_ms": 31,
+    "threshold": 0.05,
+    "p95_limit_ms": 200.0,
+    "duration_s": 30.1,
+    "ep": {
+      "cart:add": [
+        58,
+        0
+      ],
+      "catalogue:categories": [
+        79,
+        0
+      ],
+      "catalogue:product": [
+        79,
+        0
+      ],
+      "catalogue:products": [
+        0,
+        0
+      ],
+      "payment:pay": [
+        31,
+        0
+      ],
+      "ratings:fetch": [
+        79,
+        0
+      ],
+      "ratings:rate": [
+        23,
+        0
+      ],
+      "shipping:calc": [
+        31,
+        0
+      ],
+      "shipping:codes": [
+        29,
+        0
+      ],
+      "shipping:confirm": [
+        31,
+        0
+      ],
+      "shipping:match": [
+        31,
+        0
+      ],
+      "user:login": [
+        9,
+        0
+      ],
+      "user:uniqueid": [
+        29,
+        0
+      ],
+      "web:index": [
+        79,
+        0
+      ]
+    },
+    "lat": {
+      "cart:add": 11.8,
+      "catalogue:categories": 5.1,
+      "catalogue:product": 6.1,
+      "payment:pay": 17.2,
+      "ratings:fetch": 9.7,
+      "ratings:rate": 28.8,
+      "shipping:calc": 5.3,
+      "shipping:codes": 5.0,
+      "shipping:confirm": 6.4,
+      "shipping:match": 244.8,
+      "user:login": 5.8,
+      "user:uniqueid": 4.1,
+      "web:index": 2.0
+    }
+  },
+  "intent_id": 3,
+  "inject_result": {
+    "intent_id": 3,
+    "fault_type": "container_crash",
+    "target": "catalogue",
+    "params": {},
+    "status": "running",
+    "created_at": "2026-10-10T21:03:23.594072",
+    "expires_at": "2026-10-10T21:06:23.594072",
+    "ttl_seconds": 180,
+    "rollback_command": "docker start robotshop-catalogue-1"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 3,
+      "fault_type": "container_crash",
+      "target": "catalogue",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-10T21:03:58.976787",
+      "error": null,
+      "details": {
+        "fault_type": "container_crash",
+        "target": "catalogue",
+        "container": "robotshop-catalogue-1",
+        "action": "started"
+      }
+    }
+  },
+  "rolled_back_by": "day1_demo",
+  "summary": {
+    "services_down": [
+      "robotshop-catalogue-1"
+    ],
+    "endpoints_failing": [
+      "cart:add"
+    ],
+    "endpoints_slow": [
+      "cart:add"
+    ],
+    "evidence": {
+      "t": 5.2,
+      "service": "catalogue",
+      "path": "/api/catalogue/health",
+      "status": null,
+      "error": "timeout",
+      "ms": 3023,
+      "ok": false
+    },
+    "peak_error_rate": 0.42857142857142855,
+    "time_to_detect_s": 24.7,
+    "time_to_recover_s": 15.7,
+    "recovered": true
+  }
+}

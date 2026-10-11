@@ -1,0 +1,603 @@
+{
+  "target": "payment_to_gateway",
+  "fault": "network_latency",
+  "params": {
+    "latency_ms": 2000,
+    "jitter_ms": 200
+  },
+  "label": "autopilot: network_latency:payment_to_gateway",
+  "window_s": 5.0,
+  "started_at": "2026-10-11T03:55:18",
+  "windows": [
+    {
+      "t": 5.2,
+      "phase": "fault",
+      "req": 95,
+      "err": 0.0,
+      "p95": 25,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          0
+        ],
+        "catalogue:categories": [
+          11,
+          0
+        ],
+        "catalogue:product": [
+          11,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          2,
+          0
+        ],
+        "ratings:fetch": [
+          11,
+          0
+        ],
+        "ratings:rate": [
+          2,
+          0
+        ],
+        "shipping:calc": [
+          6,
+          0
+        ],
+        "shipping:codes": [
+          7,
+          0
+        ],
+        "shipping:confirm": [
+          6,
+          0
+        ],
+        "shipping:match": [
+          6,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          7,
+          0
+        ],
+        "web:index": [
+          11,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 8.9,
+        "catalogue:categories": 3.5,
+        "catalogue:product": 4.9,
+        "payment:pay": 1063.0,
+        "ratings:fetch": 8.9,
+        "ratings:rate": 19.0,
+        "shipping:calc": 4.6,
+        "shipping:codes": 4.8,
+        "shipping:confirm": 5.6,
+        "shipping:match": 672.8,
+        "user:login": 7.2,
+        "user:uniqueid": 3.6,
+        "web:index": 1.6
+      },
+      "slow": [
+        "payment:pay"
+      ],
+      "probe": {
+        "path": "/api/payment/health",
+        "status": null,
+        "error": "timeout",
+        "ms": 3034,
+        "ok": false
+      }
+    },
+    {
+      "t": 13.5,
+      "phase": "fault",
+      "req": 81,
+      "err": 0.0,
+      "p95": 2100.0,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          10,
+          0
+        ],
+        "catalogue:product": [
+          10,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          10,
+          0
+        ],
+        "ratings:rate": [
+          4,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          10,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.8,
+        "catalogue:categories": 4.9,
+        "catalogue:product": 5.8,
+        "payment:pay": 5523.7,
+        "ratings:fetch": 11.7,
+        "ratings:rate": 22.4,
+        "shipping:calc": 4.2,
+        "shipping:codes": 4.1,
+        "shipping:confirm": 5.4,
+        "shipping:match": 753.3,
+        "user:login": 8.4,
+        "user:uniqueid": 3.6,
+        "web:index": 2.2
+      },
+      "slow": [
+        "payment:pay"
+      ],
+      "probe": {
+        "path": "/api/payment/health",
+        "status": null,
+        "error": "timeout",
+        "ms": 3016,
+        "ok": false
+      }
+    },
+    {
+      "t": 21.7,
+      "phase": "recovery",
+      "req": 88,
+      "err": 0.0,
+      "p95": 2100.0,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          0
+        ],
+        "catalogue:categories": [
+          5,
+          0
+        ],
+        "catalogue:product": [
+          5,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          11,
+          0
+        ],
+        "ratings:fetch": [
+          5,
+          0
+        ],
+        "ratings:rate": [
+          5,
+          0
+        ],
+        "shipping:calc": [
+          7,
+          0
+        ],
+        "shipping:codes": [
+          7,
+          0
+        ],
+        "shipping:confirm": [
+          7,
+          0
+        ],
+        "shipping:match": [
+          7,
+          0
+        ],
+        "user:login": [
+          3,
+          0
+        ],
+        "user:uniqueid": [
+          7,
+          0
+        ],
+        "web:index": [
+          5,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 10.2,
+        "catalogue:categories": 4.5,
+        "catalogue:product": 5.5,
+        "payment:pay": 3354.7,
+        "ratings:fetch": 9.1,
+        "ratings:rate": 29.5,
+        "shipping:calc": 4.0,
+        "shipping:codes": 4.8,
+        "shipping:confirm": 5.2,
+        "shipping:match": 48.6,
+        "user:login": 4.9,
+        "user:uniqueid": 5.1,
+        "web:index": 1.9
+      },
+      "slow": [
+        "payment:pay"
+      ],
+      "probe": {
+        "path": "/api/payment/health",
+        "status": 200,
+        "error": null,
+        "ms": 16,
+        "ok": true
+      }
+    },
+    {
+      "t": 27.0,
+      "phase": "recovery",
+      "req": 124,
+      "err": 0.0,
+      "p95": 32,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          12,
+          0
+        ],
+        "catalogue:categories": [
+          17,
+          0
+        ],
+        "catalogue:product": [
+          17,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          6,
+          0
+        ],
+        "ratings:fetch": [
+          17,
+          0
+        ],
+        "ratings:rate": [
+          6,
+          0
+        ],
+        "shipping:calc": [
+          6,
+          0
+        ],
+        "shipping:codes": [
+          6,
+          0
+        ],
+        "shipping:confirm": [
+          6,
+          0
+        ],
+        "shipping:match": [
+          6,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          6,
+          0
+        ],
+        "web:index": [
+          17,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.5,
+        "catalogue:categories": 3.9,
+        "catalogue:product": 5.4,
+        "payment:pay": 15.2,
+        "ratings:fetch": 8.5,
+        "ratings:rate": 22.3,
+        "shipping:calc": 4.6,
+        "shipping:codes": 5.4,
+        "shipping:confirm": 5.4,
+        "shipping:match": 339.6,
+        "user:login": 5.0,
+        "user:uniqueid": 3.4,
+        "web:index": 1.8
+      },
+      "slow": [],
+      "probe": {
+        "path": "/api/payment/health",
+        "status": 200,
+        "error": null,
+        "ms": 8,
+        "ok": true
+      }
+    },
+    {
+      "t": 32.2,
+      "phase": "recovery",
+      "req": 111,
+      "err": 0.0,
+      "p95": 34,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          19,
+          0
+        ],
+        "catalogue:product": [
+          19,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          4,
+          0
+        ],
+        "ratings:fetch": [
+          19,
+          0
+        ],
+        "ratings:rate": [
+          3,
+          0
+        ],
+        "shipping:calc": [
+          4,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          4,
+          0
+        ],
+        "shipping:match": [
+          4,
+          0
+        ],
+        "user:login": [
+          0,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          19,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 10.8,
+        "catalogue:categories": 4.4,
+        "catalogue:product": 5.9,
+        "payment:pay": 17.0,
+        "ratings:fetch": 9.7,
+        "ratings:rate": 22.0,
+        "shipping:calc": 3.9,
+        "shipping:codes": 4.0,
+        "shipping:confirm": 4.8,
+        "shipping:match": 126.3,
+        "user:uniqueid": 4.2,
+        "web:index": 2.1
+      },
+      "slow": [],
+      "probe": {
+        "path": "/api/payment/health",
+        "status": 200,
+        "error": null,
+        "ms": 27,
+        "ok": true
+      }
+    }
+  ],
+  "baseline": {
+    "requests": 589,
+    "error_rate": 0.0,
+    "p95_ms": 29,
+    "threshold": 0.05,
+    "p95_limit_ms": 200.0,
+    "duration_s": 30.1,
+    "ep": {
+      "cart:add": [
+        52,
+        0
+      ],
+      "catalogue:categories": [
+        85,
+        0
+      ],
+      "catalogue:product": [
+        85,
+        0
+      ],
+      "catalogue:products": [
+        0,
+        0
+      ],
+      "payment:pay": [
+        26,
+        0
+      ],
+      "ratings:fetch": [
+        85,
+        0
+      ],
+      "ratings:rate": [
+        25,
+        0
+      ],
+      "shipping:calc": [
+        26,
+        0
+      ],
+      "shipping:codes": [
+        26,
+        0
+      ],
+      "shipping:confirm": [
+        26,
+        0
+      ],
+      "shipping:match": [
+        26,
+        0
+      ],
+      "user:login": [
+        16,
+        0
+      ],
+      "user:uniqueid": [
+        26,
+        0
+      ],
+      "web:index": [
+        85,
+        0
+      ]
+    },
+    "lat": {
+      "cart:add": 10.3,
+      "catalogue:categories": 4.9,
+      "catalogue:product": 6.2,
+      "payment:pay": 16.3,
+      "ratings:fetch": 9.8,
+      "ratings:rate": 24.3,
+      "shipping:calc": 4.8,
+      "shipping:codes": 4.6,
+      "shipping:confirm": 5.9,
+      "shipping:match": 162.6,
+      "user:login": 5.9,
+      "user:uniqueid": 3.9,
+      "web:index": 2.1
+    }
+  },
+  "intent_id": 8,
+  "inject_result": {
+    "intent_id": 8,
+    "fault_type": "network_latency",
+    "target": "payment_to_gateway",
+    "params": {
+      "latency_ms": 2000,
+      "jitter_ms": 200
+    },
+    "status": "running",
+    "created_at": "2026-10-10T22:25:49.200964",
+    "expires_at": "2026-10-10T22:28:49.200964",
+    "ttl_seconds": 180,
+    "rollback_command": "DELETE http://toxiproxy:8474/proxies/payment_to_gateway/toxics/chaos_payment_to_gateway"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 8,
+      "fault_type": "network_latency",
+      "target": "payment_to_gateway",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-10T22:26:05.748606",
+      "error": null,
+      "details": {
+        "fault_type": "network_latency",
+        "target": "payment_to_gateway",
+        "toxic_name": "chaos_payment_to_gateway",
+        "action": "removed"
+      }
+    }
+  },
+  "rolled_back_by": "day1_demo",
+  "summary": {
+    "services_down": [],
+    "endpoints_failing": [],
+    "endpoints_slow": [
+      "payment:pay"
+    ],
+    "evidence": {
+      "t": 5.2,
+      "service": "payment",
+      "path": "/api/payment/health",
+      "status": null,
+      "error": "timeout",
+      "ms": 3034,
+      "ok": false
+    },
+    "peak_error_rate": 0.0,
+    "time_to_detect_s": 16.5,
+    "time_to_recover_s": 15.8,
+    "recovered": true
+  }
+}

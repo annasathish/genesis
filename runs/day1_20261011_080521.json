@@ -1,0 +1,998 @@
+{
+  "target": "rabbitmq",
+  "fault": "rabbitmq_block",
+  "params": {},
+  "label": "autopilot: rabbitmq_block:rabbitmq",
+  "window_s": 5.0,
+  "started_at": "2026-10-11T08:03:54",
+  "windows": [
+    {
+      "t": 5.2,
+      "phase": "fault",
+      "req": 83,
+      "err": 0.03614457831325301,
+      "p95": 25,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          6,
+          0
+        ],
+        "catalogue:categories": [
+          14,
+          0
+        ],
+        "catalogue:product": [
+          14,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          3,
+          3
+        ],
+        "ratings:fetch": [
+          14,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          3,
+          0
+        ],
+        "shipping:codes": [
+          3,
+          0
+        ],
+        "shipping:confirm": [
+          3,
+          0
+        ],
+        "shipping:match": [
+          3,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          3,
+          0
+        ],
+        "web:index": [
+          14,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 11.7,
+        "catalogue:categories": 4.1,
+        "catalogue:product": 5.9,
+        "payment:pay": 22.0,
+        "ratings:fetch": 10.5,
+        "ratings:rate": 20.9,
+        "shipping:calc": 5.4,
+        "shipping:codes": 7.3,
+        "shipping:confirm": 7.1,
+        "shipping:match": 857.2,
+        "user:login": 4.1,
+        "user:uniqueid": 3.1,
+        "web:index": 1.7
+      },
+      "slow": [
+        "shipping:match"
+      ],
+      "probe": null
+    },
+    {
+      "t": 10.4,
+      "phase": "fault",
+      "req": 126,
+      "err": 0.03968253968253968,
+      "p95": 31,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          10,
+          0
+        ],
+        "catalogue:categories": [
+          19,
+          0
+        ],
+        "catalogue:product": [
+          19,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          5
+        ],
+        "ratings:fetch": [
+          19,
+          0
+        ],
+        "ratings:rate": [
+          5,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          5,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          5,
+          0
+        ],
+        "user:uniqueid": [
+          5,
+          0
+        ],
+        "web:index": [
+          19,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 11.5,
+        "catalogue:categories": 4.5,
+        "catalogue:product": 5.9,
+        "payment:pay": 25.5,
+        "ratings:fetch": 9.4,
+        "ratings:rate": 23.7,
+        "shipping:calc": 5.9,
+        "shipping:codes": 5.6,
+        "shipping:confirm": 8.4,
+        "shipping:match": 54.7,
+        "user:login": 5.0,
+        "user:uniqueid": 3.1,
+        "web:index": 1.5
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 15.6,
+      "phase": "fault",
+      "req": 77,
+      "err": 0.07792207792207792,
+      "p95": 33,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          0
+        ],
+        "catalogue:categories": [
+          5,
+          0
+        ],
+        "catalogue:product": [
+          5,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          6,
+          6
+        ],
+        "ratings:fetch": [
+          5,
+          0
+        ],
+        "ratings:rate": [
+          3,
+          0
+        ],
+        "shipping:calc": [
+          6,
+          0
+        ],
+        "shipping:codes": [
+          7,
+          0
+        ],
+        "shipping:confirm": [
+          6,
+          0
+        ],
+        "shipping:match": [
+          6,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          7,
+          0
+        ],
+        "web:index": [
+          5,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 14.6,
+        "catalogue:categories": 7.0,
+        "catalogue:product": 10.1,
+        "payment:pay": 21.7,
+        "ratings:fetch": 14.6,
+        "ratings:rate": 15.9,
+        "shipping:calc": 8.2,
+        "shipping:codes": 6.7,
+        "shipping:confirm": 8.1,
+        "shipping:match": 133.4,
+        "user:login": 5.9,
+        "user:uniqueid": 4.5,
+        "web:index": 1.8
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 20.8,
+      "phase": "fault",
+      "req": 112,
+      "err": 0.044642857142857144,
+      "p95": 41,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          16,
+          0
+        ],
+        "catalogue:product": [
+          16,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          5
+        ],
+        "ratings:fetch": [
+          16,
+          0
+        ],
+        "ratings:rate": [
+          6,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          6,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          16,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 10.9,
+        "catalogue:categories": 4.3,
+        "catalogue:product": 6.1,
+        "payment:pay": 20.0,
+        "ratings:fetch": 10.7,
+        "ratings:rate": 23.2,
+        "shipping:calc": 5.9,
+        "shipping:codes": 7.4,
+        "shipping:confirm": 8.1,
+        "shipping:match": 466.6,
+        "user:login": 5.0,
+        "user:uniqueid": 3.1,
+        "web:index": 1.8
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 26.0,
+      "phase": "fault",
+      "req": 139,
+      "err": 0.07913669064748201,
+      "p95": 83,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          22,
+          0
+        ],
+        "catalogue:categories": [
+          12,
+          0
+        ],
+        "catalogue:product": [
+          12,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          11,
+          11
+        ],
+        "ratings:fetch": [
+          12,
+          0
+        ],
+        "ratings:rate": [
+          2,
+          0
+        ],
+        "shipping:calc": [
+          11,
+          0
+        ],
+        "shipping:codes": [
+          11,
+          0
+        ],
+        "shipping:confirm": [
+          11,
+          0
+        ],
+        "shipping:match": [
+          11,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          11,
+          0
+        ],
+        "web:index": [
+          12,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 16.1,
+        "catalogue:categories": 5.8,
+        "catalogue:product": 6.7,
+        "payment:pay": 28.8,
+        "ratings:fetch": 16.0,
+        "ratings:rate": 49.1,
+        "shipping:calc": 7.7,
+        "shipping:codes": 8.6,
+        "shipping:confirm": 11.5,
+        "shipping:match": 415.2,
+        "user:login": 4.5,
+        "user:uniqueid": 4.7,
+        "web:index": 2.7
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 31.2,
+      "phase": "fault",
+      "req": 103,
+      "err": 0.04854368932038835,
+      "p95": 68,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          12,
+          0
+        ],
+        "catalogue:categories": [
+          13,
+          0
+        ],
+        "catalogue:product": [
+          13,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          5
+        ],
+        "ratings:fetch": [
+          13,
+          0
+        ],
+        "ratings:rate": [
+          2,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          6,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          5,
+          0
+        ],
+        "user:uniqueid": [
+          6,
+          0
+        ],
+        "web:index": [
+          13,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 10.2,
+        "catalogue:categories": 3.9,
+        "catalogue:product": 5.4,
+        "payment:pay": 15.1,
+        "ratings:fetch": 8.6,
+        "ratings:rate": 15.9,
+        "shipping:calc": 4.0,
+        "shipping:codes": 5.3,
+        "shipping:confirm": 6.0,
+        "shipping:match": 455.9,
+        "user:login": 4.8,
+        "user:uniqueid": 3.0,
+        "web:index": 1.7
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 36.4,
+      "phase": "fault",
+      "req": 85,
+      "err": 0.058823529411764705,
+      "p95": 30,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          10,
+          0
+        ],
+        "catalogue:product": [
+          10,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          5
+        ],
+        "ratings:fetch": [
+          10,
+          0
+        ],
+        "ratings:rate": [
+          3,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          6,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          10,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.5,
+        "catalogue:categories": 4.7,
+        "catalogue:product": 6.0,
+        "payment:pay": 14.6,
+        "ratings:fetch": 9.9,
+        "ratings:rate": 18.6,
+        "shipping:calc": 4.0,
+        "shipping:codes": 4.2,
+        "shipping:confirm": 5.0,
+        "shipping:match": 442.1,
+        "user:login": 4.7,
+        "user:uniqueid": 5.1,
+        "web:index": 2.5
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 41.6,
+      "phase": "fault",
+      "req": 114,
+      "err": 0.05263157894736842,
+      "p95": 37,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          12,
+          0
+        ],
+        "catalogue:categories": [
+          16,
+          0
+        ],
+        "catalogue:product": [
+          16,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          6,
+          6
+        ],
+        "ratings:fetch": [
+          16,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          6,
+          0
+        ],
+        "shipping:codes": [
+          6,
+          0
+        ],
+        "shipping:confirm": [
+          6,
+          0
+        ],
+        "shipping:match": [
+          6,
+          0
+        ],
+        "user:login": [
+          1,
+          0
+        ],
+        "user:uniqueid": [
+          6,
+          0
+        ],
+        "web:index": [
+          16,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 8.7,
+        "catalogue:categories": 4.4,
+        "catalogue:product": 6.5,
+        "payment:pay": 16.1,
+        "ratings:fetch": 9.3,
+        "ratings:rate": 36.8,
+        "shipping:calc": 4.4,
+        "shipping:codes": 4.1,
+        "shipping:confirm": 5.4,
+        "shipping:match": 394.3,
+        "user:login": 3.7,
+        "user:uniqueid": 3.4,
+        "web:index": 2.1
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 50.3,
+      "phase": "recovery",
+      "req": 126,
+      "err": 0.007936507936507936,
+      "p95": 25,
+      "failing": [
+        "payment:pay"
+      ],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          10,
+          0
+        ],
+        "catalogue:categories": [
+          20,
+          0
+        ],
+        "catalogue:product": [
+          20,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          1
+        ],
+        "ratings:fetch": [
+          19,
+          0
+        ],
+        "ratings:rate": [
+          4,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          5,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          3,
+          0
+        ],
+        "user:uniqueid": [
+          5,
+          0
+        ],
+        "web:index": [
+          20,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 8.3,
+        "catalogue:categories": 5.1,
+        "catalogue:product": 5.3,
+        "payment:pay": 15.9,
+        "ratings:fetch": 7.7,
+        "ratings:rate": 17.2,
+        "shipping:calc": 3.9,
+        "shipping:codes": 4.5,
+        "shipping:confirm": 6.4,
+        "shipping:match": 290.2,
+        "user:login": 5.4,
+        "user:uniqueid": 3.5,
+        "web:index": 1.7
+      },
+      "slow": [],
+      "probe": null
+    },
+    {
+      "t": 55.5,
+      "phase": "recovery",
+      "req": 116,
+      "err": 0.0,
+      "p95": 25,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          10,
+          0
+        ],
+        "catalogue:categories": [
+          18,
+          0
+        ],
+        "catalogue:product": [
+          18,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          19,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          5,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          5,
+          0
+        ],
+        "web:index": [
+          18,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 11.3,
+        "catalogue:categories": 3.8,
+        "catalogue:product": 5.0,
+        "payment:pay": 13.9,
+        "ratings:fetch": 7.8,
+        "ratings:rate": 25.0,
+        "shipping:calc": 4.7,
+        "shipping:codes": 5.5,
+        "shipping:confirm": 5.8,
+        "shipping:match": 157.1,
+        "user:login": 8.9,
+        "user:uniqueid": 4.6,
+        "web:index": 2.0
+      },
+      "slow": [],
+      "probe": null
+    }
+  ],
+  "baseline": {
+    "requests": 612,
+    "error_rate": 0.0,
+    "p95_ms": 41,
+    "threshold": 0.05,
+    "p95_limit_ms": 205.0,
+    "duration_s": 30.1,
+    "ep": {
+      "cart:add": [
+        60,
+        0
+      ],
+      "catalogue:categories": [
+        86,
+        0
+      ],
+      "catalogue:product": [
+        86,
+        0
+      ],
+      "catalogue:products": [
+        0,
+        0
+      ],
+      "payment:pay": [
+        30,
+        0
+      ],
+      "ratings:fetch": [
+        86,
+        0
+      ],
+      "ratings:rate": [
+        11,
+        0
+      ],
+      "shipping:calc": [
+        30,
+        0
+      ],
+      "shipping:codes": [
+        30,
+        0
+      ],
+      "shipping:confirm": [
+        30,
+        0
+      ],
+      "shipping:match": [
+        30,
+        0
+      ],
+      "user:login": [
+        17,
+        0
+      ],
+      "user:uniqueid": [
+        30,
+        0
+      ],
+      "web:index": [
+        86,
+        0
+      ]
+    },
+    "lat": {
+      "cart:add": 11.4,
+      "catalogue:categories": 4.4,
+      "catalogue:product": 5.8,
+      "payment:pay": 17.3,
+      "ratings:fetch": 10.5,
+      "ratings:rate": 23.7,
+      "shipping:calc": 5.0,
+      "shipping:codes": 6.1,
+      "shipping:confirm": 6.5,
+      "shipping:match": 143.5,
+      "user:login": 5.6,
+      "user:uniqueid": 3.2,
+      "web:index": 1.7
+    }
+  },
+  "intent_id": 17,
+  "inject_result": {
+    "intent_id": 17,
+    "fault_type": "rabbitmq_block",
+    "target": "rabbitmq",
+    "params": {},
+    "status": "running",
+    "created_at": "2026-10-11T02:34:24.818840",
+    "expires_at": "2026-10-11T02:37:24.818840",
+    "ttl_seconds": 180,
+    "rollback_command": "docker exec robotshop-rabbitmq-1 rabbitmqctl start_app"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 17,
+      "fault_type": "rabbitmq_block",
+      "target": "rabbitmq",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-11T02:35:11.157364",
+      "error": null,
+      "details": {
+        "fault_type": "rabbitmq_block",
+        "target": "rabbitmq",
+        "container": "robotshop-rabbitmq-1",
+        "action": "started_app"
+      }
+    }
+  },
+  "rolled_back_by": "day1_demo",
+  "auto_healed": [],
+  "summary": {
+    "services_down": [],
+    "endpoints_failing": [
+      "payment:pay"
+    ],
+    "endpoints_slow": [
+      "shipping:match"
+    ],
+    "evidence": null,
+    "peak_error_rate": 0.07913669064748201,
+    "time_to_detect_s": 41.6,
+    "time_to_recover_s": 10.4,
+    "recovered": true,
+    "auto_healed": []
+  }
+}

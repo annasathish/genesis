@@ -310,7 +310,8 @@ class DockerMonitor:
                 c_project = labels.get("com.docker.compose.project")
 
                 matched = True
-                if self.project_name and c_project:
+                if self.project_name:
+                    # a container without a compose project label (e.g. an unrelated local container) is not ours
                     matched = (c_project == self.project_name)
                 elif self.container_prefix:
                     matched = c_name.startswith(self.container_prefix)

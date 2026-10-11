@@ -12,7 +12,8 @@ API    ?= http://127.0.0.1:8000
 
 .PHONY: help pull up down nuke sandbox-up controller-up ps logs stats verify test-caps test-fill \
         toxics-clear db-export backup-fetch backup-build backup-up backup-down map baseline inject stop report \
-        test watchdog-up controller-dev watchdog-dev demo
+        test watchdog-up controller-dev watchdog-dev demo \
+        insights dashboard findings fix-replicas fix-revert
 
 help:
 	@echo "M1 platform targets:"
@@ -26,6 +27,9 @@ help:
 	@echo "  make toxics-clear  remove every Toxiproxy toxic (manual panic for network faults)"
 	@echo "  make backup-fetch | backup-build | backup-up | backup-down   Martian Bank hot standby"
 	@echo "Team targets: make map (M2) | baseline [dur=600] (M4) | watchdog-up (M4) | inject (M3) | stop (M3/M4) | report (M5) | test | demo"
+	@echo "Insights:     make dashboard (http://127.0.0.1:8050: live map, experiments, business impact, AI report, Copilot) | make insights"
+	@echo "AI report:    make findings (Planner -> Analyzer -> Recommender agents -> reports/FINDINGS_REPORT.md; llm=0 for rules only)"
+	@echo "Fix re-run:   make fix-replicas svc=catalogue n=2 | make fix-revert svc=catalogue"
 
 # ------------------------------------------------------------------ sandbox
 pull:
@@ -120,3 +124,19 @@ demo:
 
 db-export:      ## copy the controller SQLite out of its volume to controller/chaos_state.export.db
 	$(CTL) cp api:/data/chaos_state.db controller/chaos_state.export.db
+
+# ------------------------------------------------------------------ insights + agents (host side)
+insights:       ## run-to-run improvement, significance, business impact in the terminal
+	cd controller && $(PYTHON) -m insights
+
+dashboard:      ## dashboard + Resilience Copilot on http://127.0.0.1:8050 (the controller's /dashboard redirects here)
+	cd controller && $(PYTHON) -m insights.dashboard.server
+
+findings:       ## multi-agent findings report (same as the dashboard's Generate report button)
+	cd controller && $(PYTHON) -m agents report $(if $(filter 0,$(llm)),--no-llm,)
+
+fix-replicas:   ## stretch goal "re-run after a fix": make fix-replicas svc=catalogue n=2, then re-run the experiment
+	$(PYTHON) scripts/apply_fix.py replicas --service $(or $(svc),catalogue) --count $(or $(n),2)
+
+fix-revert:     ## back to 1 replica: make fix-revert svc=catalogue
+	$(PYTHON) scripts/apply_fix.py revert --service $(or $(svc),catalogue)

@@ -1,0 +1,1298 @@
+{
+  "generated_at": "2026-10-11T02:37:20+00:00",
+  "experiments_run": 26,
+  "distinct_experiments": 5,
+  "failure_types": [
+    "container_crash",
+    "network_latency",
+    "rabbitmq_block"
+  ],
+  "overall_resilience": 4.99,
+  "summary": "The e-commerce application exhibits severe fragility around its core transactional and catalog paths, yielding an overall resilience score of 4.99. Disruptions to backend dependencies like mongodb, catalogue, payment, and rabbitmq consistently trigger 100.0% worst checkout failure rates and severe latency degradation.",
+  "plan": {
+    "ranked": [
+      {
+        "fault": "container_crash",
+        "target": "cart",
+        "service": "cart",
+        "params": {},
+        "id": "container_crash:cart",
+        "score": 50.0,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.25,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "web",
+          "shipping",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "Cart is 1 hop from payment; if cart fails it breaks web, shipping, payment; never tested.",
+        "ai_reason": "With score 50.0 and 1 hop to payment, crashing cart tests checkout resilience by potentially breaking web, shipping, and payment.",
+        "ai_rank": 1
+      },
+      {
+        "fault": "network_latency",
+        "target": "cart_to_catalogue",
+        "service": "cart",
+        "edge": {
+          "caller": "cart",
+          "dependency": "catalogue"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:cart_to_catalogue",
+        "score": 50.0,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.25,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "web",
+          "shipping",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The cart -> catalogue call is 1 hop from payment; if cart fails it breaks web, shipping, payment; never tested.",
+        "ai_reason": "Scoring 50.0 at 1 hop to payment, this reveals latency impacts on checkout by potentially breaking web, shipping, and payment.",
+        "ai_rank": 2
+      },
+      {
+        "fault": "network_latency",
+        "target": "cart_to_redis",
+        "service": "cart",
+        "edge": {
+          "caller": "cart",
+          "dependency": "redis"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:cart_to_redis",
+        "score": 50.0,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.25,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "web",
+          "shipping",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The cart -> redis call is 1 hop from payment; if cart fails it breaks web, shipping, payment; never tested.",
+        "ai_reason": "With a 50.0 score and 1 hop to payment, this evaluates cart caching failures that can break web, shipping, and payment.",
+        "ai_rank": 3
+      },
+      {
+        "fault": "network_latency",
+        "target": "payment_to_rabbitmq",
+        "service": "payment",
+        "edge": {
+          "caller": "payment",
+          "dependency": "rabbitmq"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:payment_to_rabbitmq",
+        "score": 49.2,
+        "components": {
+          "revenue_proximity": 1.0,
+          "blast_radius": 0.083,
+          "novelty": 0.3,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 0,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The payment -> rabbitmq call sits on the revenue step (payment); if payment fails it breaks web; service tested only with other faults.",
+        "ai_reason": "Directly on payment with 0 hops and score 49.2, it tests immediate checkout revenue degradation that can break web.",
+        "ai_rank": 4
+      },
+      {
+        "fault": "container_crash",
+        "target": "payment-gateway",
+        "service": "payment-gateway",
+        "params": {},
+        "id": "container_crash:payment-gateway",
+        "score": 48.3,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.167,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "payment",
+          "web"
+        ],
+        "kind": "",
+        "already_run": false,
+        "reason": "Payment-gateway is 1 hop from payment; if payment-gateway fails it breaks payment, web; never tested.",
+        "ai_reason": "Scoring 48.3 at 1 hop to payment, crashing payment-gateway exposes external checkout failures that can break payment and web.",
+        "ai_rank": 5
+      },
+      {
+        "fault": "container_crash",
+        "target": "user",
+        "service": "user",
+        "params": {},
+        "id": "container_crash:user",
+        "score": 48.3,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.167,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "web",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "User is 1 hop from payment; if user fails it breaks web, payment; never tested.",
+        "ai_reason": "With score 48.3 and 1 hop to payment, this tests user session dependencies on checkout that can break web and payment.",
+        "ai_rank": 6
+      },
+      {
+        "fault": "network_latency",
+        "target": "user_to_mongodb",
+        "service": "user",
+        "edge": {
+          "caller": "user",
+          "dependency": "mongodb"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:user_to_mongodb",
+        "score": 48.3,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.167,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "web",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The user -> mongodb call is 1 hop from payment; if user fails it breaks web, payment; never tested.",
+        "ai_reason": "Scoring 48.3 at 1 hop to payment, introducing database latency checks user profile checkout flow breaking web and payment.",
+        "ai_rank": 7
+      },
+      {
+        "fault": "disk_fill",
+        "target": "mongodb",
+        "service": "mongodb",
+        "params": {
+          "fill_mb": 120
+        },
+        "id": "disk_fill:mongodb",
+        "score": 47.5,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.583,
+          "novelty": 0.3,
+          "new_fault_type": 1.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "catalogue",
+          "user",
+          "web",
+          "payment",
+          "cart",
+          "ratings",
+          "shipping"
+        ],
+        "kind": "database",
+        "already_run": false,
+        "reason": "Mongodb is 2 hops from payment; if mongodb fails it breaks catalogue, user, web, payment, cart, ratings, shipping; service tested only with other faults; adds a new failure type (disk_fill).",
+        "ai_reason": "Scoring 47.5, this high blast radius test reveals checkout storage tolerance, potentially breaking catalogue, user, web, payment, cart, ratings, and shipping.",
+        "ai_rank": 8
+      },
+      {
+        "fault": "container_crash",
+        "target": "redis",
+        "service": "redis",
+        "params": {},
+        "id": "container_crash:redis",
+        "score": 46.7,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.417,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "user",
+          "cart",
+          "web",
+          "shipping",
+          "payment"
+        ],
+        "kind": "cache",
+        "already_run": false,
+        "reason": "Redis is 2 hops from payment; if redis fails it breaks user, cart, web, shipping, payment; never tested.",
+        "ai_reason": "Scoring 46.7 at 2 hops to payment, crashing redis reveals shared caching impact across user, cart, web, shipping, and payment.",
+        "ai_rank": 9
+      },
+      {
+        "fault": "container_crash",
+        "target": "payment",
+        "service": "payment",
+        "params": {},
+        "id": "container_crash:payment",
+        "score": 41.7,
+        "components": {
+          "revenue_proximity": 1.0,
+          "blast_radius": 0.083,
+          "novelty": 0.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 0,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": true,
+        "reason": "Payment is the revenue step; if payment fails it breaks web; already run.",
+        "ai_reason": "Scoring 41.7 with 0 hops to payment, this previously run experiment re-evaluates direct revenue path failures that can break web.",
+        "ai_rank": 10
+      },
+      {
+        "fault": "network_latency",
+        "target": "payment_to_gateway",
+        "service": "payment",
+        "edge": {
+          "caller": "payment",
+          "dependency": "gateway"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:payment_to_gateway",
+        "score": 41.7,
+        "components": {
+          "revenue_proximity": 1.0,
+          "blast_radius": 0.083,
+          "novelty": 0.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 0,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": true,
+        "reason": "The payment -> gateway call sits on the revenue step (payment); if payment fails it breaks web; already run.",
+        "ai_rank": 11
+      },
+      {
+        "fault": "container_crash",
+        "target": "ratings",
+        "service": "ratings",
+        "params": {},
+        "id": "container_crash:ratings",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.083,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "Ratings is 2 hops from payment; if ratings fails it breaks web; never tested.",
+        "ai_rank": 12
+      },
+      {
+        "fault": "container_crash",
+        "target": "shipping",
+        "service": "shipping",
+        "params": {},
+        "id": "container_crash:shipping",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.083,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "Shipping is 2 hops from payment; if shipping fails it breaks web; never tested.",
+        "ai_rank": 13
+      },
+      {
+        "fault": "network_latency",
+        "target": "ratings_to_mysql",
+        "service": "ratings",
+        "edge": {
+          "caller": "ratings",
+          "dependency": "mysql"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:ratings_to_mysql",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.083,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The ratings -> mysql call is 2 hops from payment; if ratings fails it breaks web; never tested.",
+        "ai_rank": 14
+      },
+      {
+        "fault": "network_latency",
+        "target": "shipping_to_cart",
+        "service": "shipping",
+        "edge": {
+          "caller": "shipping",
+          "dependency": "cart"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:shipping_to_cart",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.083,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The shipping -> cart call is 2 hops from payment; if shipping fails it breaks web; never tested.",
+        "ai_rank": 15
+      },
+      {
+        "fault": "network_latency",
+        "target": "shipping_to_mysql",
+        "service": "shipping",
+        "edge": {
+          "caller": "shipping",
+          "dependency": "mysql"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:shipping_to_mysql",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.083,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The shipping -> mysql call is 2 hops from payment; if shipping fails it breaks web; never tested.",
+        "ai_rank": 16
+      },
+      {
+        "fault": "container_crash",
+        "target": "mysql",
+        "service": "mysql",
+        "params": {},
+        "id": "container_crash:mysql",
+        "score": 40.0,
+        "components": {
+          "revenue_proximity": 0.25,
+          "blast_radius": 0.25,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 3,
+        "breaks": [
+          "shipping",
+          "ratings",
+          "web"
+        ],
+        "kind": "database",
+        "already_run": false,
+        "reason": "Mysql is 3 hops from payment; if mysql fails it breaks shipping, ratings, web; never tested.",
+        "ai_rank": 17
+      },
+      {
+        "fault": "container_crash",
+        "target": "dispatch",
+        "service": "dispatch",
+        "params": {},
+        "id": "container_crash:dispatch",
+        "score": 38.3,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.0,
+          "novelty": 1.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "Dispatch is 2 hops from payment; no other service calls it; never tested.",
+        "ai_rank": 18
+      },
+      {
+        "fault": "container_crash",
+        "target": "rabbitmq",
+        "service": "rabbitmq",
+        "params": {},
+        "id": "container_crash:rabbitmq",
+        "score": 32.5,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.25,
+          "novelty": 0.3,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "payment",
+          "dispatch",
+          "web"
+        ],
+        "kind": "queue",
+        "already_run": false,
+        "reason": "Rabbitmq is 1 hop from payment; if rabbitmq fails it breaks payment, dispatch, web; service tested only with other faults.",
+        "ai_rank": 19
+      },
+      {
+        "fault": "network_latency",
+        "target": "catalogue_to_mongodb",
+        "service": "catalogue",
+        "edge": {
+          "caller": "catalogue",
+          "dependency": "mongodb"
+        },
+        "params": {
+          "latency_ms": 2000,
+          "jitter_ms": 200
+        },
+        "id": "network_latency:catalogue_to_mongodb",
+        "score": 29.2,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.417,
+          "novelty": 0.3,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web",
+          "cart",
+          "ratings",
+          "shipping",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": false,
+        "reason": "The catalogue -> mongodb call is 2 hops from payment; if catalogue fails it breaks web, cart, ratings, shipping, payment; service tested only with other faults.",
+        "ai_rank": 20
+      },
+      {
+        "fault": "rabbitmq_block",
+        "target": "rabbitmq",
+        "service": "rabbitmq",
+        "params": {},
+        "id": "rabbitmq_block:rabbitmq",
+        "score": 25.0,
+        "components": {
+          "revenue_proximity": 0.5,
+          "blast_radius": 0.25,
+          "novelty": 0.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 1,
+        "breaks": [
+          "payment",
+          "dispatch",
+          "web"
+        ],
+        "kind": "queue",
+        "already_run": true,
+        "reason": "Rabbitmq is 1 hop from payment; if rabbitmq fails it breaks payment, dispatch, web; already run.",
+        "ai_rank": 21
+      },
+      {
+        "fault": "container_crash",
+        "target": "mongodb",
+        "service": "mongodb",
+        "params": {},
+        "id": "container_crash:mongodb",
+        "score": 25.0,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.583,
+          "novelty": 0.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "catalogue",
+          "user",
+          "web",
+          "payment",
+          "cart",
+          "ratings",
+          "shipping"
+        ],
+        "kind": "database",
+        "already_run": true,
+        "reason": "Mongodb is 2 hops from payment; if mongodb fails it breaks catalogue, user, web, payment, cart, ratings, shipping; already run.",
+        "ai_rank": 22
+      },
+      {
+        "fault": "container_crash",
+        "target": "catalogue",
+        "service": "catalogue",
+        "params": {},
+        "id": "container_crash:catalogue",
+        "score": 21.7,
+        "components": {
+          "revenue_proximity": 0.333,
+          "blast_radius": 0.417,
+          "novelty": 0.0,
+          "new_fault_type": 0.0
+        },
+        "hops_to_payment": 2,
+        "breaks": [
+          "web",
+          "cart",
+          "ratings",
+          "shipping",
+          "payment"
+        ],
+        "kind": "worker",
+        "already_run": true,
+        "reason": "Catalogue is 2 hops from payment; if catalogue fails it breaks web, cart, ratings, shipping, payment; already run.",
+        "ai_rank": 23
+      }
+    ],
+    "selected": [],
+    "already_run": 5,
+    "budget": 4,
+    "method": "score = 100 x (0.40 x revenue proximity [1/(1+hops from payment)] + 0.20 x blast radius [services that break / all services] + 0.25 x novelty [1 never tested, 0.3 service tested with another fault, 0 already run] + 0.15 x new fault type); ties go to the experiment closer to payment; select the highest, one per fault type, up to 4 experiments in total",
+    "ranked_by": "ai"
+  },
+  "findings": [
+    {
+      "id": "container_crash:mongodb",
+      "fault": "container_crash",
+      "target": "mongodb",
+      "service": "mongodb",
+      "edge": null,
+      "params": {},
+      "runs": 1,
+      "latest_run": "day1_20261011_030826",
+      "resilience_score": 1.9,
+      "severity_score": 82.2,
+      "severity": "Critical",
+      "p95_ratio": 13636.9,
+      "components": {
+        "error_spike": 1.0,
+        "checkout_peak_loss": 1.0,
+        "recovery": 0.454,
+        "cascade": 0.286,
+        "slowdown_points": 20.0
+      },
+      "evidence": {
+        "peak_error_rate": 1.0,
+        "fault_error_rate": 0.4074,
+        "error_minutes": 0.136,
+        "failed_requests": 21,
+        "baseline_p95_ms": 23,
+        "p95_peak_ms": 60000.0,
+        "time_to_detect_s": 67.7,
+        "time_to_recover_s": 15.6,
+        "incident_s": 81.7,
+        "checkout_peak_loss": 1.0,
+        "sandbox_checkouts_lost": 69.1,
+        "evidence": null,
+        "endpoints_failing": [
+          "cart:add",
+          "catalogue:categories"
+        ],
+        "endpoints_slow": [
+          "cart:add",
+          "catalogue:categories"
+        ],
+        "slowest_endpoint": {
+          "endpoint": "catalogue:categories",
+          "baseline_ms": 4.4,
+          "peak_ms": 60002.4,
+          "ratio": 13636.9
+        },
+        "services_down": [
+          "robotshop-mongodb-1"
+        ],
+        "recovered": true
+      },
+      "run_to_run_verdict": null,
+      "fix_verification": [],
+      "explanation": "The mongodb container crashed, taking down the primary datastore relied upon by the catalogue and user services. This caused severe cascading failures where catalogue:categories degraded to 60002.4 ms mean latency and peak error rates reached 100.0%. Users faced a complete checkout failure of 100.0% alongside 69.1 checkouts lost in the sandbox and extreme latency reaching a p95 of 60000.0 ms (baseline 23 ms).",
+      "rank": 1,
+      "rule_explanation": "The container_crash fault on mongodb pushed the error rate to 100.0% at peak (0.136 error-minutes); catalogue:categories slowed to 60002.4 ms mean (13636.9x its 4.4 ms baseline); at its worst 100% of expected checkouts did not complete; the failure cascaded to cart, catalogue (failing endpoints: cart:add, catalogue:categories); detected after 67.7 s; recovered 15.6 s after rollback.",
+      "explained_by": "ai"
+    },
+    {
+      "id": "container_crash:catalogue",
+      "fault": "container_crash",
+      "target": "catalogue",
+      "service": "catalogue",
+      "edge": null,
+      "params": {},
+      "runs": 11,
+      "latest_run": "day1_20261011_080702",
+      "resilience_score": 4.56,
+      "severity_score": 78.4,
+      "severity": "Critical",
+      "p95_ratio": 720.4,
+      "components": {
+        "error_spike": 1.0,
+        "checkout_peak_loss": 1.0,
+        "recovery": 0.184,
+        "cascade": 0.429,
+        "slowdown_points": 20.0
+      },
+      "evidence": {
+        "peak_error_rate": 0.375,
+        "fault_error_rate": 0.0335,
+        "error_minutes": 0.07,
+        "failed_requests": 77,
+        "baseline_p95_ms": 36,
+        "p95_peak_ms": 7900.0,
+        "time_to_detect_s": 16.5,
+        "time_to_recover_s": 15.9,
+        "incident_s": 33.1,
+        "checkout_peak_loss": 1.0,
+        "sandbox_checkouts_lost": 7.0,
+        "evidence": {
+          "t": 5.2,
+          "service": "catalogue",
+          "path": "/api/catalogue/health",
+          "status": null,
+          "error": "timeout",
+          "ms": 3040,
+          "ok": false
+        },
+        "endpoints_failing": [
+          "cart:add",
+          "catalogue:categories",
+          "catalogue:product",
+          "ratings:rate"
+        ],
+        "endpoints_slow": [
+          "cart:add",
+          "ratings:rate"
+        ],
+        "slowest_endpoint": {
+          "endpoint": "cart:add",
+          "baseline_ms": 9.6,
+          "peak_ms": 6916.2,
+          "ratio": 720.4
+        },
+        "services_down": [
+          "robotshop-catalogue-1"
+        ],
+        "recovered": true
+      },
+      "run_to_run_verdict": null,
+      "fix_verification": [
+        {
+          "fix": "fix: catalogue x2 replicas",
+          "verdict": "improved",
+          "runs_before": 4,
+          "runs_after": 2,
+          "error_minutes": [
+            0.1415,
+            0.0015
+          ],
+          "error_minutes_change": 0.9894,
+          "fault_error_rate": [
+            0.0377,
+            0.0
+          ],
+          "resilience_score": [
+            8.3525,
+            5.9
+          ],
+          "p_value": 2.84e-08,
+          "side_effect": {
+            "endpoint": "catalogue:product",
+            "baseline_ms": 6.5,
+            "peak_ms": 51436.6,
+            "ratio": 7913.3
+          }
+        }
+      ],
+      "explanation": "A crash of the catalogue container caused its health probe to timeout at +5.2 s, disrupting dependent upstream services including cart and ratings. The cart:add endpoint slowed significantly to 6916.2 ms mean vs 9.6 ms baseline (720.4x) with 77 failed requests recorded. Users experienced a 100.0% worst checkout failure rate, a peak error rate of 37.5%, and an overall p95 latency spike to 7900.0 ms (baseline 36 ms).",
+      "rank": 2,
+      "rule_explanation": "The container_crash fault on catalogue pushed the error rate to 37.5% at peak (0.07 error-minutes); cart:add slowed to 6916.2 ms mean (720.4x its 9.6 ms baseline); at its worst 100% of expected checkouts did not complete; the failure cascaded to cart, ratings (failing endpoints: cart:add, catalogue:categories, catalogue:product, ratings:rate); proof: GET /api/catalogue/health through the shop returned timeout at +5.2 s; detected after 16.5 s; recovered 15.9 s after rollback.",
+      "explained_by": "ai"
+    },
+    {
+      "id": "container_crash:payment",
+      "fault": "container_crash",
+      "target": "payment",
+      "service": "payment",
+      "edge": null,
+      "params": {},
+      "runs": 4,
+      "latest_run": "day1_20261011_080210",
+      "resilience_score": 5.89,
+      "severity_score": 66.8,
+      "severity": "Critical",
+      "p95_ratio": 9.63,
+      "components": {
+        "error_spike": 1.0,
+        "checkout_peak_loss": 1.0,
+        "recovery": 0.256,
+        "cascade": 0.0,
+        "slowdown_points": 19.2
+      },
+      "evidence": {
+        "peak_error_rate": 0.0,
+        "fault_error_rate": 0.0,
+        "error_minutes": 0.027,
+        "failed_requests": 39,
+        "baseline_p95_ms": 27,
+        "p95_peak_ms": 260.0,
+        "time_to_detect_s": 24.7,
+        "time_to_recover_s": 15.8,
+        "incident_s": 46.0,
+        "checkout_peak_loss": 1.0,
+        "sandbox_checkouts_lost": 12.0,
+        "evidence": {
+          "t": 5.2,
+          "service": "payment",
+          "path": "/api/payment/health",
+          "status": null,
+          "error": "timeout",
+          "ms": 3031,
+          "ok": false
+        },
+        "endpoints_failing": [],
+        "endpoints_slow": [],
+        "slowest_endpoint": {
+          "endpoint": "payment:pay",
+          "baseline_ms": 19.2,
+          "peak_ms": 50.0,
+          "ratio": 2.6
+        },
+        "services_down": [
+          "robotshop-payment-1"
+        ],
+        "recovered": true
+      },
+      "run_to_run_verdict": "no significant change",
+      "fix_verification": [],
+      "explanation": "Crashing the payment container caused health check timeouts at +5.2 s for the payment service. Because checkout flows depend on the payment service, users suffered a 100.0% worst checkout failure rate with 12.0 checkouts lost in the sandbox and 39 failed requests. However, system-wide peak error rates remained at 0.0% while p95 latency increased modestly to 260.0 ms (baseline 27 ms).",
+      "rank": 3,
+      "rule_explanation": "The container_crash fault on payment caused no request errors; payment:pay slowed to 50.0 ms mean (2.6x its 19.2 ms baseline); at its worst 100% of expected checkouts did not complete; no endpoint failed: the system absorbed the fault; proof: GET /api/payment/health through the shop returned timeout at +5.2 s; detected after 24.7 s; recovered 15.8 s after rollback.",
+      "explained_by": "ai"
+    },
+    {
+      "id": "rabbitmq_block:rabbitmq",
+      "fault": "rabbitmq_block",
+      "target": "rabbitmq",
+      "service": "rabbitmq",
+      "edge": null,
+      "params": {},
+      "runs": 5,
+      "latest_run": "day1_20261011_080521",
+      "resilience_score": 6.71,
+      "severity_score": 63.2,
+      "severity": "Critical",
+      "p95_ratio": 6.0,
+      "components": {
+        "error_spike": 1.0,
+        "checkout_peak_loss": 1.0,
+        "recovery": 0.259,
+        "cascade": 0.143,
+        "slowdown_points": 11.1
+      },
+      "evidence": {
+        "peak_error_rate": 0.0791,
+        "fault_error_rate": 0.0548,
+        "error_minutes": 0.037,
+        "failed_requests": 47,
+        "baseline_p95_ms": 41,
+        "p95_peak_ms": 83,
+        "time_to_detect_s": 41.6,
+        "time_to_recover_s": 10.4,
+        "incident_s": 46.6,
+        "checkout_peak_loss": 1.0,
+        "sandbox_checkouts_lost": 40.9,
+        "evidence": null,
+        "endpoints_failing": [
+          "payment:pay"
+        ],
+        "endpoints_slow": [
+          "shipping:match"
+        ],
+        "slowest_endpoint": {
+          "endpoint": "shipping:match",
+          "baseline_ms": 143.5,
+          "peak_ms": 857.2,
+          "ratio": 6.0
+        },
+        "services_down": [],
+        "recovered": true
+      },
+      "run_to_run_verdict": "no significant change",
+      "fix_verification": [],
+      "explanation": "Blocking the rabbitmq message broker disrupted asynchronous communication paths from payment and dispatch. This direct dependency failure caused payment:pay to fail and shipping:match to slow down to 857.2 ms mean vs 143.5 ms baseline (6.0x). Consequently, users experienced a 100.0% worst checkout failure rate, 40.9 checkouts lost in the sandbox, and 47 failed requests.",
+      "rank": 4,
+      "rule_explanation": "The rabbitmq_block fault on rabbitmq pushed the error rate to 7.9% at peak (0.037 error-minutes); shipping:match slowed to 857.2 ms mean (6.0x its 143.5 ms baseline); at its worst 100% of expected checkouts did not complete; the failure cascaded to payment (failing endpoints: payment:pay); detected after 41.6 s; recovered 10.4 s after rollback.",
+      "explained_by": "ai"
+    },
+    {
+      "id": "network_latency:payment_to_gateway:{\"jitter_ms\": 200, \"latency_ms\": 2000}",
+      "fault": "network_latency",
+      "target": "payment_to_gateway",
+      "service": "payment",
+      "edge": {
+        "caller": "payment",
+        "dependency": "gateway"
+      },
+      "params": {
+        "latency_ms": 2000,
+        "jitter_ms": 200
+      },
+      "runs": 5,
+      "latest_run": "day1_20261011_080333",
+      "resilience_score": 5.89,
+      "severity_score": 51.1,
+      "severity": "High",
+      "p95_ratio": 291.5,
+      "components": {
+        "error_spike": 0.777,
+        "checkout_peak_loss": 0.777,
+        "recovery": 0.0,
+        "cascade": 0.0,
+        "slowdown_points": 20.0
+      },
+      "evidence": {
+        "peak_error_rate": 0.0,
+        "fault_error_rate": 0.0,
+        "error_minutes": 0.0,
+        "failed_requests": 0,
+        "baseline_p95_ms": 51,
+        "p95_peak_ms": 2200.0,
+        "time_to_detect_s": 16.4,
+        "time_to_recover_s": 15.9,
+        "incident_s": 0.0,
+        "checkout_peak_loss": 0.777,
+        "sandbox_checkouts_lost": 4.0,
+        "evidence": {
+          "t": 5.2,
+          "service": "payment",
+          "path": "/api/payment/health",
+          "status": null,
+          "error": "timeout",
+          "ms": 3002,
+          "ok": false
+        },
+        "endpoints_failing": [],
+        "endpoints_slow": [
+          "payment:pay"
+        ],
+        "slowest_endpoint": {
+          "endpoint": "payment:pay",
+          "baseline_ms": 16.9,
+          "peak_ms": 4925.7,
+          "ratio": 291.5
+        },
+        "services_down": [],
+        "recovered": true
+      },
+      "run_to_run_verdict": "no significant change",
+      "fix_verification": [],
+      "explanation": "Injecting 2000 ms of network latency with 200 ms jitter between payment and gateway induced upstream health probe timeouts at +5.2 s. The payment:pay endpoint experienced significant delay, surging to 4925.7 ms mean vs 16.9 ms baseline (291.5x) and elevating overall p95 latency to 2200.0 ms (baseline 51 ms). As a result, users experienced a 77.7% worst checkout failure rate and 4.0 lost checkouts in the sandbox.",
+      "rank": 5,
+      "rule_explanation": "The network_latency fault on the payment -> gateway call caused no request errors; payment:pay slowed to 4925.7 ms mean (291.5x its 16.9 ms baseline); at its worst 78% of expected checkouts did not complete; no endpoint failed: the system absorbed the fault; proof: GET /api/payment/health through the shop returned timeout at +5.2 s; detected after 16.4 s; recovered 15.9 s after rollback.",
+      "explained_by": "ai"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "container_crash:mongodb",
+      "weakness_rank": 1,
+      "service": "mongodb",
+      "fault": "container_crash",
+      "severity": "Critical",
+      "fix": "Implement Circuit Breaker",
+      "action": "Configure a circuit breaker with cached fallbacks in callers like cart and catalogue when communicating with mongodb. This prevents cascading timeouts and complete request failure when mongodb becomes unavailable.",
+      "verified_fix": null,
+      "priority_score": 164.4,
+      "protects": {
+        "annual_exposure": 21678.84,
+        "cost_per_incident": 3613.14,
+        "orders_lost_per_incident": 130.0,
+        "currency": "USD",
+        "estimated": false
+      },
+      "verify": "python scripts/day1_demo.py --fault container_crash --target mongodb --label \"fix: implement circuit breaker\"  (after applying the fix; the Experiments tab then compares before vs after)",
+      "priority": 1,
+      "rule_action": "Run at least 2 replicas of mongodb, and put a circuit breaker with a cached fallback in its callers (cart, catalogue) so they degrade instead of failing.",
+      "written_by": "ai"
+    },
+    {
+      "id": "rabbitmq_block:rabbitmq",
+      "weakness_rank": 4,
+      "service": "rabbitmq",
+      "fault": "rabbitmq_block",
+      "severity": "Critical",
+      "fix": "Buffer Writes in a Durable Queue",
+      "action": "Have payment buffer order events in a local transactional outbox when rabbitmq is blocked or unavailable. This ensures checkout can proceed without dropping messages while delaying dispatch processing.",
+      "verified_fix": null,
+      "priority_score": 103.0,
+      "protects": {
+        "annual_exposure": 13659.57,
+        "cost_per_incident": 2276.6,
+        "orders_lost_per_incident": 82.0,
+        "currency": "USD",
+        "estimated": false
+      },
+      "verify": "python scripts/day1_demo.py --fault rabbitmq_block --target rabbitmq --label \"fix: buffer writes in a durable queue\"  (after applying the fix; the Experiments tab then compares before vs after)",
+      "priority": 2,
+      "rule_action": "Have payment write orders to a local outbox (retry + dead-letter queue) when the broker is unavailable, so a queue outage delays dispatch instead of failing checkout.",
+      "written_by": "ai"
+    },
+    {
+      "id": "container_crash:catalogue",
+      "weakness_rank": 2,
+      "service": "catalogue",
+      "fault": "container_crash",
+      "severity": "Critical",
+      "fix": "Adjust Timeouts",
+      "action": "Configure short upstream connect timeouts and quick failover retries to healthy replicas at the gateway. This avoids high latency spikes on catalogue endpoints during instance crashes.",
+      "verified_fix": {
+        "fix": "fix: catalogue x2 replicas",
+        "verdict": "improved",
+        "runs_before": 4,
+        "runs_after": 2,
+        "error_minutes": [
+          0.1415,
+          0.0015
+        ],
+        "error_minutes_change": 0.9894,
+        "fault_error_rate": [
+          0.0377,
+          0.0
+        ],
+        "resilience_score": [
+          8.3525,
+          5.9
+        ],
+        "p_value": 2.84e-08,
+        "side_effect": {
+          "endpoint": "catalogue:product",
+          "baseline_ms": 6.5,
+          "peak_ms": 51436.6,
+          "ratio": 7913.3
+        }
+      },
+      "priority_score": 86.3,
+      "protects": {
+        "annual_exposure": 2184.6,
+        "cost_per_incident": 364.1,
+        "orders_lost_per_incident": 12.7,
+        "currency": "USD",
+        "estimated": false
+      },
+      "verify": "python scripts/day1_demo.py --fault container_crash --target catalogue --label \"fix: adjust timeouts\"  (after applying the fix; the Experiments tab then compares before vs after)",
+      "priority": 3,
+      "rule_action": "Keep the replicas ('fix: catalogue x2 replicas' removed the errors) and give the gateway a short upstream connect timeout with retry to the next replica: during failover catalogue:product hung at 51436.6 ms (7913.3x its baseline) before succeeding.",
+      "written_by": "ai"
+    },
+    {
+      "id": "container_crash:payment",
+      "weakness_rank": 3,
+      "service": "payment",
+      "fault": "container_crash",
+      "severity": "Critical",
+      "fix": "Increase Replicas",
+      "action": "Run multiple replicas of the payment service behind the load balancer with active health checks. This ensures uninterrupted checkout processing if a single container crashes.",
+      "verified_fix": null,
+      "priority_score": 77.4,
+      "protects": {
+        "annual_exposure": 3426.41,
+        "cost_per_incident": 571.07,
+        "orders_lost_per_incident": 20.0,
+        "currency": "USD",
+        "estimated": false
+      },
+      "verify": "python scripts/day1_demo.py --fault container_crash --target payment --label \"fix: increase replicas\"  (after applying the fix; the Experiments tab then compares before vs after)",
+      "priority": 4,
+      "rule_action": "Run at least 2 replicas of payment behind the gateway with health checks, so one crashed container no longer takes the endpoint down.",
+      "written_by": "ai"
+    },
+    {
+      "id": "network_latency:payment_to_gateway:{\"jitter_ms\": 200, \"latency_ms\": 2000}",
+      "weakness_rank": 5,
+      "service": "payment",
+      "fault": "network_latency",
+      "severity": "High",
+      "fix": "Adjust Timeouts",
+      "action": "Enforce strict call timeouts and bounded retries on the payment service's calls to the gateway. This enables fast failure and prevents requests from hanging when high network latency occurs.",
+      "verified_fix": null,
+      "priority_score": 54.6,
+      "protects": {
+        "annual_exposure": 1467.33,
+        "cost_per_incident": 244.56,
+        "orders_lost_per_incident": 8.9,
+        "currency": "USD",
+        "estimated": false
+      },
+      "verify": "python scripts/day1_demo.py --fault network_latency --target payment_to_gateway --params '{\"jitter_ms\": 200, \"latency_ms\": 2000}' --label \"fix: adjust timeouts\"  (after applying the fix; the Experiments tab then compares before vs after)",
+      "priority": 5,
+      "rule_action": "Give payment's calls to gateway a timeout well below the user-facing budget, with a bounded retry and a circuit breaker, so a slow gateway fails fast instead of holding requests.",
+      "written_by": "ai"
+    }
+  ],
+  "improvement": [
+    {
+      "signature": "container_crash:catalogue",
+      "runs": [
+        "day1_20261010_153655",
+        "day1_20261010_153826",
+        "day1_20261010_154738",
+        "day1_20261010_171315",
+        "day1_20261010_231011",
+        "day1_20261010_231230",
+        "day1_20261011_023112",
+        "day1_20261011_023425",
+        "day1_20261011_033931",
+        "day1_20261011_035922",
+        "day1_20261011_080702"
+      ],
+      "cumulative": {
+        "verdict": "no significant change",
+        "primary_relative_change": 0.6175,
+        "significance": {
+          "z": -0.79,
+          "p_value": 0.43,
+          "alpha": 0.05,
+          "significant": false,
+          "test": "two-proportion z-test on fault-phase failures/requests"
+        }
+      }
+    },
+    {
+      "signature": "network_latency:payment_to_gateway:{\"jitter_ms\": 200, \"latency_ms\": 2000}",
+      "runs": [
+        "day1_20261010_225203",
+        "day1_20261011_020947",
+        "day1_20261011_035621",
+        "day1_20261011_074720",
+        "day1_20261011_080333"
+      ],
+      "cumulative": {
+        "verdict": "no significant change",
+        "primary_relative_change": 0.0,
+        "significance": {
+          "z": 0.0,
+          "p_value": 1.0,
+          "alpha": 0.05,
+          "significant": false,
+          "test": "two-proportion z-test on fault-phase failures/requests"
+        }
+      }
+    },
+    {
+      "signature": "rabbitmq_block:rabbitmq",
+      "runs": [
+        "day1_20261010_225315",
+        "day1_20261011_031546",
+        "day1_20261011_035739",
+        "day1_20261011_075037",
+        "day1_20261011_080521"
+      ],
+      "cumulative": {
+        "verdict": "no significant change",
+        "primary_relative_change": -2.3636,
+        "significance": {
+          "z": 0.285,
+          "p_value": 0.776,
+          "alpha": 0.05,
+          "significant": false,
+          "test": "two-proportion z-test on fault-phase failures/requests"
+        }
+      }
+    },
+    {
+      "signature": "container_crash:payment",
+      "runs": [
+        "day1_20261010_225519",
+        "day1_20261011_035458",
+        "day1_20261011_074557",
+        "day1_20261011_080210"
+      ],
+      "cumulative": {
+        "verdict": "no significant change",
+        "primary_relative_change": -0.08,
+        "significance": {
+          "z": 3.358,
+          "p_value": 0.000785,
+          "alpha": 0.05,
+          "significant": true,
+          "test": "two-proportion z-test on fault-phase failures/requests"
+        }
+      }
+    },
+    {
+      "signature": "container_crash:mongodb",
+      "runs": [
+        "day1_20261011_030826"
+      ],
+      "cumulative": null
+    }
+  ],
+  "business_assumptions": {
+    "currency": "USD",
+    "avg_order_value": 45.0,
+    "orders_per_minute": 120,
+    "customer_retry_rate": 0.4,
+    "incident_cost_per_minute": 25.0,
+    "incidents_per_year": 6,
+    "support_ticket_rate": 0.15,
+    "cost_per_ticket": 6.0,
+    "slo_target": 0.999,
+    "slo_window_days": 30
+  },
+  "coverage": {
+    "tested": 4,
+    "total": 13,
+    "untested": [
+      "redis",
+      "cart",
+      "mysql",
+      "user",
+      "payment-gateway",
+      "shipping",
+      "ratings",
+      "web",
+      "dispatch"
+    ]
+  },
+  "agents": [
+    {
+      "agent": "planner",
+      "role": "Ranks and selects chaos experiments from the dependency map, one reason per experiment",
+      "mode": "llm",
+      "model": "gemini-3.8-flash",
+      "notes": [],
+      "duration_s": 0.01
+    },
+    {
+      "agent": "analyzer",
+      "role": "Explains each experiment's findings, ranks weaknesses by severity, gives a resilience score",
+      "mode": "llm",
+      "model": "gemini-3.8-flash",
+      "notes": [],
+      "duration_s": 11.17
+    },
+    {
+      "agent": "recommender",
+      "role": "Recommends one prioritised, verifiable fix per weakness, with the money it protects",
+      "mode": "llm",
+      "model": "gemini-3.8-flash",
+      "notes": [],
+      "duration_s": 6.62
+    }
+  ],
+  "sources": {
+    "runs_dir": "D:\\genesis\\runs",
+    "runs": [
+      "day1_20261010_153655",
+      "day1_20261010_153826",
+      "day1_20261010_154738",
+      "day1_20261010_171315",
+      "day1_20261010_225203",
+      "day1_20261010_225315",
+      "day1_20261010_225519",
+      "day1_20261010_231011",
+      "day1_20261010_231230",
+      "day1_20261011_020947",
+      "day1_20261011_023112",
+      "day1_20261011_023425",
+      "day1_20261011_030826",
+      "day1_20261011_031546",
+      "day1_20261011_033931",
+      "day1_20261011_035458",
+      "day1_20261011_035621",
+      "day1_20261011_035739",
+      "day1_20261011_035922",
+      "day1_20261011_074557",
+      "day1_20261011_074720",
+      "day1_20261011_075037",
+      "day1_20261011_080210",
+      "day1_20261011_080333",
+      "day1_20261011_080521",
+      "day1_20261011_080702"
+    ]
+  }
+}

@@ -39,6 +39,11 @@ TEMPLATE_FILE = "template.md.j2"
 def _get_session(db_url: str = DEFAULT_DB_PATH):
     """Create a standalone SQLAlchemy session (no FastAPI needed)."""
     engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    try:  # older databases lack columns added to the models later
+        from models import ensure_columns
+        ensure_columns(engine)
+    except Exception:  # read-only or missing DB: the queries below report it
+        pass
     Session = sessionmaker(bind=engine)
     return Session()
 

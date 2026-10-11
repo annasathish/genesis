@@ -1,4 +1,4 @@
-fastapi==0.103.1
+fastapi==0.120.0  # 0.103.1 needs anyio<4, google-genai 2.x needs anyio>=4.8: unresolvable together
 uvicorn==0.23.2
 sqlalchemy==2.0.21
 google-genai>=2.0.0,<3.0.0
@@ -6,6 +6,7 @@ pyyaml==6.0.1
 pydantic>=2.12.5,<3.0.0
 jinja2==3.1.2
 typer==0.9.0
+click>=8.0,<8.2  # typer 0.9 breaks on click >= 8.2 (every CLI call exits 2, --help exits 1)
 rich==13.6.0
 alembic==1.13.3
 docker==7.1.0

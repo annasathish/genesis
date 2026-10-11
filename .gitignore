@@ -7,4 +7,6 @@ __pycache__/
 controller/graph.json
 graph.json
 sandbox-backup/martian-bank-demo/
+# runs/ stays ignored for scratch runs; the curated evidence runs behind reports/ are added explicitly
+# (git add -f runs/<file>.json), so later experiments never land in git by accident.
 runs/

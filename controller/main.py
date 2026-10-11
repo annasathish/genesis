@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, ExperimentIntent, ExperimentResult
+from models import Base, ExperimentIntent, ExperimentResult, ensure_columns
 
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -30,6 +30,7 @@ if not DATABASE_URL.startswith("sqlite:"):
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
+ensure_columns(engine)  # older chaos_state.db files lack columns added later (rmq_depth, target_service, details)
 
 BASELINE_PATH = Path(os.environ.get("BASELINE_PATH", CURRENT_DIR / "baseline.json"))
 GRAPH_PATH = Path(os.environ.get("GRAPH_PATH", CURRENT_DIR / "graph.json"))
@@ -90,6 +91,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Chaos Engineering Controller", lifespan=lifespan)
+
+# The team dashboard is controller/insights/dashboard (make dashboard -> http://127.0.0.1:8050). Registered before
+# dashboard_api's router so /dashboard lands there; dashboard_api's JSON routes stay available.
+from fastapi.responses import RedirectResponse
+
+DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "http://127.0.0.1:8050/")
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard_redirect():
+    return RedirectResponse(DASHBOARD_URL)
+
 
 from dashboard_api import router as dashboard_router
 
@@ -277,6 +290,22 @@ async def inject_combined_faults(req: CombinedFaultRequest):
         ]
         status = "success" if all(item["status"] == "success" for item in formatted) else "partial_failure"
         return {"status": status, "results": formatted}
+
+
+@app.get("/api/v1/intents/active")
+def active_intents():
+    """Pending/running experiment intents (read-only; used by the dashboard's Live tab)."""
+    return [
+        {
+            "intent_id": intent.id,
+            "fault_type": intent.fault_type,
+            "target": intent.target_service,
+            "status": intent.status,
+            "created_at": intent.created_at.isoformat() if intent.created_at else None,
+            "expires_at": intent.expires_at.isoformat() if intent.expires_at else None,
+        }
+        for intent in _active_intents()
+    ]
 
 
 @app.post("/api/v1/rollback/{intent_id}")

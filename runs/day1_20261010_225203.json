@@ -1,0 +1,559 @@
+{
+  "target": "payment_to_gateway",
+  "fault": "network_latency",
+  "params": {
+    "latency_ms": 2000,
+    "jitter_ms": 200
+  },
+  "label": "planner #1: payment->gateway latency",
+  "window_s": 5.0,
+  "started_at": "2026-10-10T22:51:06",
+  "windows": [
+    {
+      "t": 5.2,
+      "phase": "fault",
+      "req": 110,
+      "err": 0.0,
+      "p95": 62,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          10,
+          0
+        ],
+        "catalogue:categories": [
+          17,
+          0
+        ],
+        "catalogue:product": [
+          17,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          2,
+          0
+        ],
+        "ratings:fetch": [
+          17,
+          0
+        ],
+        "ratings:rate": [
+          2,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          5,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          3,
+          0
+        ],
+        "user:uniqueid": [
+          5,
+          0
+        ],
+        "web:index": [
+          17,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.9,
+        "catalogue:categories": 4.4,
+        "catalogue:product": 5.4,
+        "payment:pay": 2550.3,
+        "ratings:fetch": 9.5,
+        "ratings:rate": 33.7,
+        "shipping:calc": 4.9,
+        "shipping:codes": 4.9,
+        "shipping:confirm": 5.8,
+        "shipping:match": 660.0,
+        "user:login": 5.5,
+        "user:uniqueid": 3.4,
+        "web:index": 1.7
+      },
+      "slow": [
+        "payment:pay"
+      ]
+    },
+    {
+      "t": 10.4,
+      "phase": "fault",
+      "req": 59,
+      "err": 0.0,
+      "p95": 420.0,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          4,
+          0
+        ],
+        "catalogue:categories": [
+          10,
+          0
+        ],
+        "catalogue:product": [
+          10,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          2,
+          0
+        ],
+        "ratings:fetch": [
+          10,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          2,
+          0
+        ],
+        "shipping:codes": [
+          2,
+          0
+        ],
+        "shipping:confirm": [
+          2,
+          0
+        ],
+        "shipping:match": [
+          2,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          2,
+          0
+        ],
+        "web:index": [
+          10,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 15.1,
+        "catalogue:categories": 4.6,
+        "catalogue:product": 5.5,
+        "payment:pay": 3141.9,
+        "ratings:fetch": 8.8,
+        "ratings:rate": 57.5,
+        "shipping:calc": 5.6,
+        "shipping:codes": 14.2,
+        "shipping:confirm": 9.1,
+        "shipping:match": 411.2,
+        "user:login": 5.5,
+        "user:uniqueid": 4.2,
+        "web:index": 1.9
+      },
+      "slow": [
+        "payment:pay"
+      ]
+    },
+    {
+      "t": 15.7,
+      "phase": "recovery",
+      "req": 112,
+      "err": 0.0,
+      "p95": 430.0,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          14,
+          0
+        ],
+        "catalogue:categories": [
+          12,
+          0
+        ],
+        "catalogue:product": [
+          12,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          10,
+          0
+        ],
+        "ratings:fetch": [
+          12,
+          0
+        ],
+        "ratings:rate": [
+          2,
+          0
+        ],
+        "shipping:calc": [
+          7,
+          0
+        ],
+        "shipping:codes": [
+          7,
+          0
+        ],
+        "shipping:confirm": [
+          7,
+          0
+        ],
+        "shipping:match": [
+          7,
+          0
+        ],
+        "user:login": [
+          3,
+          0
+        ],
+        "user:uniqueid": [
+          7,
+          0
+        ],
+        "web:index": [
+          12,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.4,
+        "catalogue:categories": 4.3,
+        "catalogue:product": 5.5,
+        "payment:pay": 1224.3,
+        "ratings:fetch": 10.8,
+        "ratings:rate": 25.8,
+        "shipping:calc": 6.5,
+        "shipping:codes": 5.4,
+        "shipping:confirm": 7.9,
+        "shipping:match": 634.1,
+        "user:login": 4.5,
+        "user:uniqueid": 4.0,
+        "web:index": 2.3
+      },
+      "slow": [
+        "payment:pay"
+      ]
+    },
+    {
+      "t": 20.9,
+      "phase": "recovery",
+      "req": 95,
+      "err": 0.0,
+      "p95": 44,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          16,
+          0
+        ],
+        "catalogue:product": [
+          16,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          3,
+          0
+        ],
+        "ratings:fetch": [
+          16,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          3,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          3,
+          0
+        ],
+        "shipping:match": [
+          3,
+          0
+        ],
+        "user:login": [
+          2,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          16,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 14.9,
+        "catalogue:categories": 4.2,
+        "catalogue:product": 5.3,
+        "payment:pay": 20.2,
+        "ratings:fetch": 9.7,
+        "ratings:rate": 30.9,
+        "shipping:calc": 7.8,
+        "shipping:codes": 5.9,
+        "shipping:confirm": 7.4,
+        "shipping:match": 60.1,
+        "user:login": 3.6,
+        "user:uniqueid": 7.7,
+        "web:index": 1.6
+      },
+      "slow": []
+    },
+    {
+      "t": 26.1,
+      "phase": "recovery",
+      "req": 100,
+      "err": 0.0,
+      "p95": 25,
+      "failing": [],
+      "down": [],
+      "ep": {
+        "cart:add": [
+          8,
+          0
+        ],
+        "catalogue:categories": [
+          15,
+          0
+        ],
+        "catalogue:product": [
+          15,
+          0
+        ],
+        "catalogue:products": [
+          0,
+          0
+        ],
+        "payment:pay": [
+          5,
+          0
+        ],
+        "ratings:fetch": [
+          15,
+          0
+        ],
+        "ratings:rate": [
+          1,
+          0
+        ],
+        "shipping:calc": [
+          5,
+          0
+        ],
+        "shipping:codes": [
+          4,
+          0
+        ],
+        "shipping:confirm": [
+          5,
+          0
+        ],
+        "shipping:match": [
+          5,
+          0
+        ],
+        "user:login": [
+          3,
+          0
+        ],
+        "user:uniqueid": [
+          4,
+          0
+        ],
+        "web:index": [
+          15,
+          0
+        ]
+      },
+      "lat": {
+        "cart:add": 9.6,
+        "catalogue:categories": 4.1,
+        "catalogue:product": 5.2,
+        "payment:pay": 16.7,
+        "ratings:fetch": 10.0,
+        "ratings:rate": 32.1,
+        "shipping:calc": 4.7,
+        "shipping:codes": 5.4,
+        "shipping:confirm": 7.4,
+        "shipping:match": 243.9,
+        "user:login": 3.9,
+        "user:uniqueid": 3.3,
+        "web:index": 1.7
+      },
+      "slow": []
+    }
+  ],
+  "baseline": {
+    "requests": 597,
+    "error_rate": 0.0,
+    "p95_ms": 62,
+    "threshold": 0.05,
+    "p95_limit_ms": 310.0,
+    "duration_s": 30.1,
+    "ep": {
+      "cart:add": [
+        70,
+        0
+      ],
+      "catalogue:categories": [
+        70,
+        0
+      ],
+      "catalogue:product": [
+        71,
+        0
+      ],
+      "catalogue:products": [
+        0,
+        0
+      ],
+      "payment:pay": [
+        35,
+        0
+      ],
+      "ratings:fetch": [
+        71,
+        0
+      ],
+      "ratings:rate": [
+        15,
+        0
+      ],
+      "shipping:calc": [
+        35,
+        0
+      ],
+      "shipping:codes": [
+        35,
+        0
+      ],
+      "shipping:confirm": [
+        35,
+        0
+      ],
+      "shipping:match": [
+        35,
+        0
+      ],
+      "user:login": [
+        20,
+        0
+      ],
+      "user:uniqueid": [
+        35,
+        0
+      ],
+      "web:index": [
+        70,
+        0
+      ]
+    },
+    "lat": {
+      "cart:add": 11.6,
+      "catalogue:categories": 4.3,
+      "catalogue:product": 5.7,
+      "payment:pay": 21.5,
+      "ratings:fetch": 10.5,
+      "ratings:rate": 28.2,
+      "shipping:calc": 6.6,
+      "shipping:codes": 6.3,
+      "shipping:confirm": 7.8,
+      "shipping:match": 398.8,
+      "user:login": 4.7,
+      "user:uniqueid": 3.9,
+      "web:index": 1.8
+    }
+  },
+  "intent_id": 5,
+  "inject_result": {
+    "intent_id": 5,
+    "fault_type": "network_latency",
+    "target": "payment_to_gateway",
+    "params": {
+      "latency_ms": 2000,
+      "jitter_ms": 200
+    },
+    "status": "running",
+    "created_at": "2026-10-10T17:21:37.310702",
+    "expires_at": "2026-10-10T17:24:37.310702",
+    "ttl_seconds": 180,
+    "rollback_command": "DELETE http://toxiproxy:8474/proxies/payment_to_gateway/toxics/chaos_payment_to_gateway"
+  },
+  "rollback_result": {
+    "status": "success",
+    "result": {
+      "intent_id": 5,
+      "fault_type": "network_latency",
+      "target": "payment_to_gateway",
+      "status": "success",
+      "rollback_verified": true,
+      "rolled_back_at": "2026-10-10T17:21:47.961987",
+      "error": null,
+      "details": {
+        "fault_type": "network_latency",
+        "target": "payment_to_gateway",
+        "toxic_name": "chaos_payment_to_gateway",
+        "action": "removed"
+      }
+    }
+  },
+  "summary": {
+    "services_down": [],
+    "endpoints_failing": [],
+    "endpoints_slow": [
+      "payment:pay"
+    ],
+    "peak_error_rate": 0.0,
+    "time_to_detect_s": 10.4,
+    "time_to_recover_s": 15.6,
+    "recovered": true
+  }
+}
