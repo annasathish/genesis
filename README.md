@@ -16,8 +16,8 @@ records, fixes what is safe and shows the result before and after.
 | **Safety** | 33 of 33 recorded runs rolled back automatically, every rollback verified |
 | **Proven fix** | A second catalogue replica cut error-minutes by **98.9 %** (two-proportion z-test, p = 2.8 × 10⁻⁸) |
 | **AI** | Planner → Analyzer → Recommender agents on Google Gemini Flash, grounded in measured numbers |
-| **Data quality** | Null, duplicate, inconsistent and discrepant customer data detected, fixed, shown before vs after |
-| **Tests** | 178 automated tests |
+| **Data quality** | Null, duplicate, inconsistent and discrepant data detected and fixed, before vs after: live shop + a 20,300-line e-commerce dataset (quality 72.8 % → 98 %, recall 99.9 %) |
+| **Tests** | 182 automated tests |
 
 ---
 
@@ -220,6 +220,36 @@ The **Data quality** tab detects these problems, fixes what is safe, and shows t
 
 4. **Reset demo data** removes the `dq-…` customers again. The seeded shop accounts are never changed.
 
+### At scale: a 20,300-line e-commerce dataset
+
+The live shop has only a few registered customers, so the tab also checks a large e-commerce order export:
+[`data/ecommerce_orders.csv`](data/ecommerce_orders.csv). It has 20,300 order lines, about 3,000 customers and 40
+products, with INR prices, 18 % GST, and UPI, card and cash-on-delivery payments.
+
+The dataset is **synthetic**: generated with a fixed seed, with problems planted at known rates. The planted rows are
+listed in `data/ecommerce_orders_truth.json`. The detector never reads that file; it is used only afterwards to
+measure detection accuracy.
+
+| | Before | After fix |
+| --- | --- | --- |
+| Quality score (lines without a problem) | 72.8 % | **98.0 %** |
+| Problems | 6,117 (780 null · 497 duplicate · 3,220 inconsistent · 1,620 discrepancy) | 396, all flagged for a human |
+| Country spellings (`IN`, `india`, `U.S.A`, …) | 20 | 5 |
+| Blank emails | 200 | 1 (filled from the customer's other orders) |
+| Auto-fixable problems left | 5,721 | **0** |
+
+- **Detection accuracy against the planted problems:** recall 99.9 %, precision 100 %.
+- **Speed:** a scan takes under a second, a fix about 1.3 s.
+- **Downloads:** the raw, cleaned (with a `dq_status` column) and full problem-list CSVs are on the tab.
+- **Extra checks for order lines:**
+  - country spelling, date format, phone format, and status and payment spelling;
+  - product name and price against the catalogue;
+  - 18 % GST and the line total;
+  - discount between 0 and 60 %, and order dates that are not in the future.
+
+Code: `controller/insights/dataquality_dataset.py`; API `POST /api/data/dataset/{scan,fix}`,
+`GET /api/data/dataset/download/{raw,clean,issues,truth}`.
+
 Code: `controller/insights/dataquality.py` (rules, fix plan, masking), `controller/insights/dataquality_shop.py`
 (read, inject, write), API `POST /api/data/{inject,scan,fix,reset}` and `GET /api/data/last` on the dashboard.
 
@@ -297,7 +327,7 @@ From the latest autonomous campaign (Robot Shop sandbox, 11 Oct 2026):
 | Fault injection | Toxiproxy, rabbitmqctl, tmpfs | latency on 9 links; broker stop; bounded disk fill |
 | Load and observability | Locust, health probes, watchdog | traffic, live error/latency stats, UP/DOWN proof, controller heartbeat |
 | Target | Stan's Robot Shop (Instana, Apache 2.0) | the system under test |
-| Testing | pytest, pytest-asyncio | 178 automated tests |
+| Testing | pytest, pytest-asyncio | 182 automated tests |
 
 ## Repository layout
 
@@ -315,6 +345,7 @@ controller/
 scripts/                 day1_demo.py (one measured experiment), autopilot.py, apply_fix.py
 runs/                    recorded experiment evidence (day1_*.json)
 reports/                 generated findings report (Markdown + JSON)
+data/                    ecommerce_orders.csv (20,300-line e-commerce dataset) + planted-problem ground truth
 docs/                    DEMO_RUNBOOK.md, INSIGHTS.md, M1_PLATFORM.md, ...
 ```
 
@@ -325,7 +356,7 @@ python -m pip install -r controller/requirements-dev.txt
 cd controller && python -m pytest -q        # or: make test
 ```
 
-All 178 tests run without Docker or a Gemini key: Docker, HTTP and model calls are faked, and no test can read a real
+All 182 tests run without Docker or a Gemini key: Docker, HTTP and model calls are faked, and no test can read a real
 API key.
 
 ## Team

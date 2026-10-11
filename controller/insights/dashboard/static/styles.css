@@ -375,3 +375,6 @@ button.arming { background: var(--warning); color: #000; animation: blink 1s inf
 .dq-type.inconsistency { border-color: var(--serious); } .dq-type.discrepancy { border-color: var(--critical); }
 #dq-table tr.dq-review td { background: color-mix(in srgb, var(--warning) 10%, transparent); }
 #dq-table code { white-space: pre; }
+
+.dq-src { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--border); }
+.dq-src:first-of-type { margin-top: 12px; }
